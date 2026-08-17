@@ -326,7 +326,7 @@
 /* #undef HAVE_LIBCAP */
 
 /* Define to 1 if you have the <libc.h> header file. */
-#define HAVE_LIBC_H 1
+/* #undef HAVE_LIBC_H */
 
 /* Define to 1 if you have the 'dl' library (-ldl). */
 /* #undef HAVE_LIBDL */
@@ -837,7 +837,25 @@
 #define HAVE_SYS_PARAM_H 1
 
 /* Define to 1 if you have the <sys/random.h> header file. */
-#define HAVE_SYS_RANDOM_H 1
+/* iSH-AOK: undefined by hand. This config.h is generated on macOS and serves
+   BOTH the macOS CLI build and the iOS app; these headers exist on macOS and
+   not in the iOS SDK, and the app build stops on the first one it reaches.
+
+     sys/random.h  only gates the include -- this build uses arc4random_buf
+                   (HAVE_ARC4RANDOM_BUF, which iOS exports) and HAVE_GETRANDOM
+                   is already undefined, so nothing is lost.
+     utmp.h        the `watch` and `log` features' who-is-logged-in lookup.
+                   Darwin has utmpx.h instead, and the GUEST's utmp is Linux's
+                   layout anyway -- reading it with a Darwin struct would parse
+                   nonsense, so this wants routing through the shim rather than
+                   a header swap. Off until then.
+     libc.h        a legacy fallback zsh_system.h reaches for; nothing here
+                   needs it.
+
+   HAVE_TERMCAP_H deliberately STAYS defined: deps/zsh-shim/termcap.h is first
+   on the include path and supplies the declarations, because iOS ships
+   libtermcap.tbd and libncurses.tbd and is missing only the header. */
+/* #undef HAVE_SYS_RANDOM_H */
 
 /* Define to 1 if you have the <sys/resource.h> header file. */
 #define HAVE_SYS_RESOURCE_H 1
@@ -933,7 +951,7 @@
 #define HAVE_UTMPX_H 1
 
 /* Define to 1 if you have the <utmp.h> header file. */
-#define HAVE_UTMP_H 1
+/* #undef HAVE_UTMP_H */
 
 /* Define to 1 if you have the <varargs.h> header file. */
 /* #undef HAVE_VARARGS_H */
