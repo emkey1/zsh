@@ -126,12 +126,12 @@ union mem_align {
 
 /* list of zsh heaps */
 
-static Heap heaps;
+static __thread Heap heaps;
 
 /* a heap with free space, not always correct (it will be the last heap
  * if that was newly allocated but it may also be another one) */
 
-static Heap fheap;
+static __thread Heap fheap;
 
 /**/
 #ifdef ZSH_HEAP_DEBUG
@@ -526,7 +526,7 @@ static Heap
 mmap_heap_alloc(size_t *n)
 {
     Heap h;
-    static size_t pgsz = 0;
+    static __thread size_t pgsz = 0;
 
     if (!pgsz) {
 

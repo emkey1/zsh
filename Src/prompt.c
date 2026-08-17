@@ -33,33 +33,33 @@
 /* current text attributes */
 
 /**/
-mod_export zattr txtcurrentattrs;
+__thread mod_export zattr txtcurrentattrs;
 
 /* pending changes for attributes */
 
 /**/
-mod_export zattr txtpendingattrs;
+__thread mod_export zattr txtpendingattrs;
 
 /* mask of attributes with an unknown state */
 
 /**/
-mod_export zattr txtunknownattrs;
+__thread mod_export zattr txtunknownattrs;
 
 /* detected default attributes for the terminal if any */
 
 /**/
-mod_export zattr memo_term_color;
+__thread mod_export zattr memo_term_color;
 
 /* the command stack for use with %_ in prompts */
 
 /**/
-unsigned char *cmdstack;
+__thread unsigned char *cmdstack;
 /**/
-int cmdsp;
+__thread int cmdsp;
 
 /* parser states, for %_ */
 
-static char *cmdnames[CS_COUNT] = {
+static __thread char *cmdnames[CS_COUNT] = {
     "for",      "while",     "repeat",    "select",
     "until",    "if",        "then",      "else",
     "elif",     "math",      "cond",      "cmdor",
@@ -123,7 +123,7 @@ struct buf_vars {
 typedef struct buf_vars *Buf_vars;
 
 /* The currently active prompt output variables */
-static Buf_vars bv;
+static __thread Buf_vars bv;
 
 /*
  * Expand path p; maximum is npath segments where 0 means the whole path.
@@ -284,7 +284,7 @@ zattrescape(zattr atr, int *len)
 mod_export char *
 parsehighlight(char *arg, char endchar, zattr *atr, zattr *mask)
 {
-    static int entered = 0;
+    static __thread int entered = 0;
     char *var = ".zle.hlgroups";
     struct value vbuf;
     Value v;
@@ -1881,7 +1881,7 @@ mixattrs(zattr primary, zattr mask, zattr secondary)
  *****************************************************************************/
 
 /* Defines standard ANSI colour names in index order */
-static const char *ansi_colours[] = {
+static __thread const char *ansi_colours[] = {
     "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
     "default", NULL
 };
@@ -2321,7 +2321,7 @@ struct colour_sequences {
     char *end;			/* Escape sequence terminator */
     char *def;			/* Code to reset default colour */
 };
-static struct colour_sequences fg_bg_sequences[2];
+static __thread struct colour_sequences fg_bg_sequences[2];
 
 /*
  * We need a buffer for colour sequence composition.  It may
@@ -2329,12 +2329,12 @@ static struct colour_sequences fg_bg_sequences[2];
  * allocating it separately every time we send a colour sequence,
  * so do it once per refresh.
  */
-static char *colseq_buf;
+static __thread char *colseq_buf;
 
 /*
  * Count how often this has been allocated, for recursive usage.
  */
-static int colseq_buf_allocs;
+static __thread int colseq_buf_allocs;
 
 /**/
 void

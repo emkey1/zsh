@@ -37,12 +37,12 @@ struct mathvalue;
 /* nonzero means we are not evaluating, just parsing */
  
 /**/
-int noeval;
+__thread int noeval;
  
 /* integer zero */
 
 /**/
-mod_export mnumber zero_mnumber;
+__thread mod_export mnumber zero_mnumber;
 
 /*
  * The last value we computed:  note this isn't cleared
@@ -50,25 +50,25 @@ mod_export mnumber zero_mnumber;
  * Everything else is saved and returned to allow recursive calls.
  */
 /**/
-mnumber lastmathval;
+__thread mnumber lastmathval;
 
 /* last input base we used */
 
 /**/
-int lastbase;
+__thread int lastbase;
  
-static char *ptr;
+static __thread char *ptr;
 
-static mnumber yyval;
-static char *yylval;
+static __thread mnumber yyval;
+static __thread char *yylval;
 
 #define MAX_MLEVEL 256
 
-static int mlevel = 0;
+static __thread int mlevel = 0;
 
 /* != 0 means recognize unary plus, minus, etc. */
 
-static int unary = 1;
+static __thread int unary = 1;
 
 /* LR = left-to-right associativity *
  * RL = right-to-left associativity *
@@ -192,7 +192,7 @@ static int unary = 1;
  * 137 M_OUTPAR ')' (for convenience, not an operator)
  * 200 EOI (end of input:  for convenience, not an operator)
  */
-static int c_prec[TOKCOUNT] =
+static __thread int c_prec[TOKCOUNT] =
 {
 /*        M_INPAR   M_OUTPAR     NOT       COMP     POSTPLUS */
 /*  0 */     1,       137,        2,        2,         2,
@@ -248,7 +248,7 @@ static int c_prec[TOKCOUNT] =
  * 137 M_OUTPAR ')' (for convenience, not an operator)
  * 200 EOI (end of input:  for convenience, not an operator)
  */
-static int z_prec[TOKCOUNT] =
+static __thread int z_prec[TOKCOUNT] =
 {
 /*        M_INPAR   M_OUTPAR     NOT       COMP     POSTPLUS */
 /*  0 */     1,       137,        2,        2,         2,
@@ -275,7 +275,7 @@ static int z_prec[TOKCOUNT] =
 };
 
 /* Option-selectable preference table */
-static int *prec;
+static __thread int *prec;
 
 /*
  * Precedences for top and argument evaluation.  Careful:
@@ -284,7 +284,7 @@ static int *prec;
 #define TOPPREC (prec[COMMA]+1)
 #define ARGPREC (prec[COMMA]-1)
 
-static int type[TOKCOUNT] =
+static __thread int type[TOKCOUNT] =
 {
 /*  0 */  LR, LR|OP_OP|OP_OPF, RL, RL, RL|OP_OP|OP_OPF,
 /*  5 */  RL|OP_OP|OP_OPF, RL, RL, LR|OP_A2IO, LR|OP_A2IO,
@@ -302,8 +302,8 @@ static int type[TOKCOUNT] =
 /* the value stack */
 
 #define STACKSZ 100
-static int mtok;			/* last token */
-static int sp = -1;			/* stack pointer */
+static __thread int mtok;			/* last token */
+static __thread int sp = -1;			/* stack pointer */
 
 struct mathvalue {
     /*
@@ -319,7 +319,7 @@ struct mathvalue {
     mnumber val;
 };
 
-static struct mathvalue *stack;
+static __thread struct mathvalue *stack;
 
 enum prec_type {
     /* Evaluating a top-level expression */
@@ -577,10 +577,10 @@ lexconstant(void)
 }
 
 /**/
-int outputradix;
+__thread int outputradix;
 
 /**/
-int outputunderscore;
+__thread int outputunderscore;
 
 #ifndef HAVE_ISINF
 /**/
@@ -1038,7 +1038,7 @@ callmathfunc(char *o)
 {
     MathFunc f;
     char *a, *n;
-    static mnumber dummy;
+    static __thread mnumber dummy;
 
     n = a = dupstring(o);
 

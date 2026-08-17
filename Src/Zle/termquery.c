@@ -129,12 +129,12 @@ typedef const unsigned char seqstate_t;
 	CAPTURE EITHER( "\033" MATCH("\\", CLIP) OR MATCH("\007", CLIP) ) \
     OR WILDCARD )
 
-static char *EXTVAR  = ".term.extensions";
-static char *IDVAR   = ".term.id";
-static char *VERVAR  = ".term.version";
-static char *COLORVAR[]  = { ".term.fg", ".term.bg", ".term.cursor" };
-static char *MODEVAR = ".term.mode";
-static char *WAITVAR = ".term.querywait";
+static __thread char *EXTVAR  = ".term.extensions";
+static __thread char *IDVAR   = ".term.id";
+static __thread char *VERVAR  = ".term.version";
+static __thread char *COLORVAR[]  = { ".term.fg", ".term.bg", ".term.cursor" };
+static __thread char *MODEVAR = ".term.mode";
+static __thread char *WAITVAR = ".term.querywait";
 
 /* Query sequences
  * using ESC\\ as ST instead of BEL because the bell was emitted on
@@ -432,7 +432,7 @@ probe_terminal(const char *tquery, seqstate_t *states,
     settyinfo(&torig);
 }
 
-static unsigned memo_cursor;
+static __thread unsigned memo_cursor;
 
 static void
 handle_color(int bg, int red, int green, int blue)
@@ -467,9 +467,9 @@ handle_color(int bg, int red, int green, int blue)
 }
 
 /* roughly corresponding feature names */
-static const char *features[] =
+static __thread const char *features[] =
 	{ "bg", "fg", "cursorcolor", "modkeys-kitty", "truecolor", "id" };
-static const char *queries[] =
+static __thread const char *queries[] =
 	{ TQ_BGCOLOR, TQ_FGCOLOR, TQ_CURSOR, TQ_KITTYKB, TQ_RGB, TQ_XTVERSION, TQ_DA };
 
 static void
@@ -566,7 +566,7 @@ query_terminal(void) {
 
 static char*
 base64_encode(const char *src, size_t len) {
-    static const char* base64_table =
+    static __thread const char* base64_table =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     const unsigned char *end = (unsigned char *)src + len;
@@ -750,13 +750,18 @@ end_edit(void)
 const char **
 prompt_markers(void)
 {
-    static unsigned int aid = 0;
-    static char pre[] = "\033]133;A;cl=m;aid=zZZZZZZ\033\\"; /* before the prompt */
+    static __thread unsigned int aid = 0;
+    static __thread char pre[] = "\033]133;A;cl=m;aid=zZZZZZZ\033\\"; /* before the prompt */
     static const char PR[] = "\033]133;P;k=i\033\\";   /* primary (PS1) */
     static const char SE[] = "\033]133;P;k=s\033\\";   /* secondary (PS2) */
     static const char RI[] = "\033]133;P;k=r\033\\";   /* right (RPS1,2) */
-    static const char *markers[] = { pre, PR, SE, RI };
-    static const char *nomark[] = { NULL, NULL, NULL, NULL };
+    /* AOK: filled in here rather than in the initialiser, because `pre` is
+       thread-local (it is written below) and the address of a thread-local is
+       not a compile-time constant. */
+    static __thread const char *markers[4];
+    static __thread const char *nomark[] = { NULL, NULL, NULL, NULL };
+
+    markers[0] = pre; markers[1] = PR; markers[2] = SE; markers[3] = RI;
 
     if (!extension_enabled("integration", "prompt", 11, 1))
 	return nomark;
@@ -811,8 +816,8 @@ notify_pwd(void)
     write_loop(SHTTY, "\033\\", 2);
 }
 
-static unsigned int *cursor_forms;
-static unsigned int cursor_enabled_mask;
+static __thread unsigned int *cursor_forms;
+static __thread unsigned int cursor_enabled_mask;
 
 static void
 match_cursorform(const char *teststr, unsigned int *cursor_form)
@@ -876,9 +881,9 @@ void
 zle_set_cursorform(void)
 {
     char **atrs = getaparam("zle_cursorform");
-    static int setup = 0;
+    static __thread int setup = 0;
     size_t i;
-    static const char *contexts[] = {
+    static __thread const char *contexts[] = {
 	"edit:",
 	"command:",
 	"insert:",
@@ -937,7 +942,7 @@ cursor_form(void)
     char seq[32];
     char *s = seq;
     unsigned int want, changed;
-    static unsigned int state = CURF_DEFAULT;
+    static __thread unsigned int state = CURF_DEFAULT;
     enum cursorcontext context = CURC_DEFAULT;
 
     if (!cursor_forms)

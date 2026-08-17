@@ -63,12 +63,12 @@ struct parc {
     double self;
 };
 
-static Pfunc calls;
-static int ncalls;
-static Parc arcs;
-static int narcs;
-static Sfunc stack;
-static Module zprof_module;
+static __thread Pfunc calls;
+static __thread int ncalls;
+static __thread Parc arcs;
+static __thread int narcs;
+static __thread Sfunc stack;
+static __thread Module zprof_module;
 
 static void
 freepfuncs(Pfunc f)
@@ -311,21 +311,33 @@ zprof_wrapper(Eprog prog, FuncWrap w, char *name)
     return 0;
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("zprof", 0, bin_zprof, 0, 0, 0, "c", NULL),
 };
 
-static struct funcwrap wrapper[] = {
+static __thread struct funcwrap wrapper[] = {
     WRAPDEF(zprof_wrapper),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

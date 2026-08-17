@@ -2,16 +2,16 @@
 #ifndef have_Src_Zle_zle_utils_globals
 #define have_Src_Zle_zle_utils_globals
 
-extern struct cutbuffer cutbuf;
-extern struct cutbuffer*kring;
-extern int kringsize;
-extern int kringnum;
-extern struct cutbuffer vibuf[36];
-extern ZLE_STRING_T lastline;
-extern int lastlinesz;
-extern int lastll;
-extern int lastcs;
-extern int linesz;
+__thread extern struct cutbuffer cutbuf;
+__thread extern struct cutbuffer*kring;
+__thread extern int kringsize;
+__thread extern int kringnum;
+__thread extern struct cutbuffer vibuf[36];
+__thread extern ZLE_STRING_T lastline;
+__thread extern int lastlinesz;
+__thread extern int lastll;
+__thread extern int lastcs;
+__thread extern int linesz;
 extern void sizeline(int sz);
 extern mod_import_function void zleaddtoline(int chr);
 extern int zlecharasstring(ZLE_CHAR_T inchar,char*buf);
@@ -40,8 +40,8 @@ extern int printbind(char*str,FILE*stream);
 extern mod_import_function void showmsg(char const*msg);
 extern int handlefeep(UNUSED(char**args));
 extern int handlesuffix(UNUSED(char**args));
-extern struct change*curchange;
-extern zlong undo_changeno;
+__thread extern struct change*curchange;
+__thread extern zlong undo_changeno;
 extern void initundo(void);
 extern void freeundo(void);
 extern mod_import_function void handleundo(void);

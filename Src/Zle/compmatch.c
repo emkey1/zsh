@@ -284,14 +284,14 @@ revert_cline(Cline p)
  * use for the match, and two cline lists for the two levels we use. */
 
 /**/
-char *matchbuf = NULL;
+__thread char *matchbuf = NULL;
 /**/
-int matchbuflen = 0, matchbufadded;
+__thread int matchbuflen = 0, matchbufadded;
 
 /**/
-Cline matchparts, matchlastpart;
+__thread Cline matchparts, matchlastpart;
 /**/
-Cline matchsubs, matchlastsub;
+__thread Cline matchsubs, matchlastsub;
 
 /* This initialises the variables above. */
 
@@ -1991,8 +1991,8 @@ bld_line(Cmatcher mp, ZLE_STRING_T line, char *mword, char *word,
 static char *
 join_strs(int la, char *sa, int lb, char *sb)
 {
-    static char *rs = NULL;
-    static int rl = 0;
+    static __thread char *rs = NULL;
+    static __thread int rl = 0;
 
     Cmlist ms;
     Cmatcher mp;

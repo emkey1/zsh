@@ -2,6 +2,6 @@
 #ifndef have_Src_Modules_errnames_globals
 #define have_Src_Modules_errnames_globals
 
-extern const char*sys_errnames[ERRCOUNT+1];
+__thread extern const char*sys_errnames[ERRCOUNT+1];
 
 #endif /* !have_Src_Modules_errnames_globals */

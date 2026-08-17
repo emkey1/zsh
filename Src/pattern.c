@@ -255,7 +255,7 @@ static const char zpc_chars[ZPC_COUNT] = {
  * NULL means no way of turning this on or off.
  */
 /**/
-mod_export const char *zpc_strings[ZPC_COUNT] = {
+__thread mod_export const char *zpc_strings[ZPC_COUNT] = {
    NULL, NULL, "|", NULL, "~", "(", "?", "*", "[", "<",
    "^", "#", NULL, "?(", "*(", "+(", "!(", "\\!(", "@("
 };
@@ -265,13 +265,13 @@ mod_export const char *zpc_strings[ZPC_COUNT] = {
  * using "disable -p".
  */
 /**/
-mod_export char zpc_disables[ZPC_COUNT];
+__thread mod_export char zpc_disables[ZPC_COUNT];
 
 /*
  * Stack of saved (compressed) zpc_disables for function scope.
  */
 
-static struct zpc_disables_save *zpc_disables_stack;
+static __thread struct zpc_disables_save *zpc_disables_stack;
 
 /*
  * Characters which terminate a simple string (ZPC_COUNT) or
@@ -286,22 +286,22 @@ static struct zpc_disables_save *zpc_disables_stack;
  */
 
 /**/
-char zpc_special[ZPC_COUNT];
+__thread char zpc_special[ZPC_COUNT];
 
 /* Default size for pattern buffer */
 #define P_DEF_ALLOC 256
 
 /* Flags used in compilation */
-static char *patstart, *patparse;	/* input pointers */
-static int patnpar;		/* () count */
-static char *patcode;		/* point of code emission */
-static long patsize;		/* size of code */
-static char *patout;		/* start of code emission string */
-static long patalloc;		/* size allocated for same */
+static __thread char *patstart, *patparse;	/* input pointers */
+static __thread int patnpar;		/* () count */
+static __thread char *patcode;		/* point of code emission */
+static __thread long patsize;		/* size of code */
+static __thread char *patout;		/* start of code emission string */
+static __thread long patalloc;		/* size allocated for same */
 
 /* Flags used in both compilation and execution */
-static int patflags;		    /* flags passed down to patcompile */
-static int patglobflags;  /* globbing flags & approx */
+static __thread int patflags;		    /* flags passed down to patcompile */
+static __thread int patglobflags;  /* globbing flags & approx */
 
 /*
  * Increment pointer to metafied multibyte string.
@@ -318,7 +318,7 @@ typedef wint_t patint_t;
  * to maintain it properly between characters.  If we don't
  * need it we should use mbtowc() instead.
  */
-static mbstate_t shiftstate;
+static __thread mbstate_t shiftstate;
 
 /* See clear_mbstate() in params.c for the use of clear_shiftstate() */
 
@@ -449,7 +449,7 @@ patadd(char *add, int ch, long n, int paflags)
     patcode = patout + patsize;
 }
 
-static long rn_offs;
+static __thread long rn_offs;
 /* operates on pointers to union upat, returns a pointer */
 #define PATNEXT(p) ((rn_offs = P_NEXT(p)) ? \
 		    (P_OP(p) == P_BACK) ? \
@@ -1131,7 +1131,7 @@ patgetglobflags(char **strp, long *assertp, int *ignore)
 }
 
 
-static const char *colon_stuffs[]  = {
+static __thread const char *colon_stuffs[]  = {
     "alpha", "alnum", "ascii", "blank", "cntrl", "digit", "graph", 
     "lower", "print", "punct", "space", "upper", "xdigit", "IDENT",
     "IFS", "IFSSPACE", "WORD", "INCOMPLETE", "INVALID", NULL
@@ -1890,7 +1890,7 @@ struct rpat {
     int globdots;		/* Glob initial dots? */
 };
 
-static struct rpat pattrystate;
+static __thread struct rpat pattrystate;
 
 #define patinstart	(pattrystate.patinstart)
 #define patinend	(pattrystate.patinend)
@@ -2048,10 +2048,10 @@ charsub(char *x, char *y)
  * a multi-component file path.  See horror story in glob.c.
  */
 /**/
-int errsfound;				/* Total error count so far */
+__thread int errsfound;				/* Total error count so far */
 
 /**/
-int forceerrs;				/* Forced maximum error count */
+__thread int forceerrs;				/* Forced maximum error count */
 
 /*
  * exactpos is used to remember how far down an exact string we have
@@ -2061,7 +2061,7 @@ int forceerrs;				/* Forced maximum error count */
  * exactend is a pointer to the end of the string, which isn't
  * null-terminated.
  */
-static char *exactpos, *exactend;
+static __thread char *exactpos, *exactend;
 
 /**/
 void

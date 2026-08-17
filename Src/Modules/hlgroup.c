@@ -168,18 +168,30 @@ scanpmsgr(UNUSED(HashTable ht), ScanFunc func, int flags)
     scangroup(func, flags, 1);
 }
 
-static struct paramdef partab[] = {
+static __thread struct paramdef partab[] = {
     SPECIALPMDEF(".zle.esc", PM_READONLY_SPECIAL, 0, getpmesc, scanpmesc),
     SPECIALPMDEF(".zle.sgr", PM_READONLY_SPECIAL, 0, getpmsgr, scanpmsgr)
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     NULL, 0,
     NULL, 0,
     NULL, 0,
     partab, sizeof(partab)/sizeof(*partab),
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

@@ -49,10 +49,10 @@ struct schedcmd {
 
 /* the list of sched jobs pending */
 
-static struct schedcmd *schedcmds;
+static __thread struct schedcmd *schedcmds;
 
 /* flag that timed event is running (via addtimedfn())*/
-static int schedcmdtimed;
+static __thread int schedcmdtimed;
 
 /* Use addtimedfn() to add a timed event for sched's use */
 
@@ -372,25 +372,54 @@ schedgetfn(UNUSED(Param pm))
 }
 
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("sched", 0, bin_sched, 0, -1, 0, NULL, NULL),
 };
 
-static const struct gsu_array sched_gsu =
+static __thread const struct gsu_array sched_gsu =
 { schedgetfn, arrsetfn, stdunsetfn };
 
-static struct paramdef partab[] = {
+/* AOK: partab's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef struct paramdef aok_tt_partab[1];
+static __thread aok_tt_partab aok_tv_partab;
+static __thread char aok_ti_partab;
+static aok_tt_partab *aok_tf_partab(void) {
+    if (!aok_ti_partab) {
+        struct paramdef aok_tmp[] = {
     SPECIALPMDEF("zsh_scheduled_events", PM_ARRAY|PM_READONLY,
 		 &sched_gsu, NULL, NULL)
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 1,
+                       "partab: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_partab, aok_tmp, sizeof(aok_tmp));
+        aok_ti_partab = 1;
+    }
+    return &aok_tv_partab;
+}
+#define partab (*aok_tf_partab())
 
-static struct features module_features = {
+
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     partab, sizeof(partab)/sizeof(*partab),
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

@@ -587,12 +587,12 @@ bin_hashinfo(UNUSED(char *nam), UNUSED(char **args), UNUSED(Options ops), UNUSED
 /* hash table containing external commands */
  
 /**/
-mod_export HashTable cmdnamtab;
+__thread mod_export HashTable cmdnamtab;
  
 /* how far we've hashed the PATH so far */
  
 /**/
-mod_export char **pathchecked;
+__thread mod_export char **pathchecked;
 
 /* Create a new command hash table */
  
@@ -805,7 +805,7 @@ printcmdnamnode(HashNode hn, int printflags)
 /* hash table containing the shell functions */
 
 /**/
-mod_export HashTable shfunctab;
+__thread mod_export HashTable shfunctab;
 
 /**/
 void
@@ -1073,7 +1073,7 @@ getshfuncfile(Shfunc shf)
 
 /* Nodes for reserved word hash table */
 
-static struct reswd reswds[] = {
+static __thread struct reswd reswds[] = {
     {{NULL, "!", 0}, BANG},
     {{NULL, "[[", 0}, DINBRACK},
     {{NULL, "{", 0}, INBRACE},
@@ -1111,7 +1111,7 @@ static struct reswd reswds[] = {
 /* hash table containing the reserved words */
 
 /**/
-mod_export HashTable reswdtab;
+__thread mod_export HashTable reswdtab;
 
 /* Build the hash table containing zsh's reserved words. */
 
@@ -1174,12 +1174,12 @@ printreswdnode(HashNode hn, int printflags)
 /* hash table containing the aliases */
  
 /**/
-mod_export HashTable aliastab;
+__thread mod_export HashTable aliastab;
  
 /* has table containing suffix aliases */
 
 /**/
-mod_export HashTable sufaliastab;
+__thread mod_export HashTable sufaliastab;
  
 /* Create new hash tables for aliases */
 
@@ -1514,8 +1514,8 @@ struct dircache_entry
  * for multiple references to the same directory, e.g
  * "autoload /blah/blah/\*".
  */
-static struct dircache_entry *dircache, *dircache_lastentry;
-static int dircache_size;
+static __thread struct dircache_entry *dircache, *dircache_lastentry;
+static __thread int dircache_size;
 
 /*
  * Set *name to point to a cached version of value.

@@ -33,17 +33,17 @@
 /* != 0 if we're getting a vi range */
 
 /**/
-int virangeflag;
+__thread int virangeflag;
 
 /* kludge to get cw and dw to work right */
 
 /**/
-int wordflag;
+__thread int wordflag;
 
 /* != 0 if we're killing lines into a buffer, vi-style */
 
 /**/
-int vilinerange;
+__thread int vilinerange;
 
 /*
  * lastvichg: last vi change buffer, for vi change repetition
@@ -51,7 +51,7 @@ int vilinerange;
  */
 
 /**/
-struct vichange lastvichg, curvichg;
+__thread struct vichange lastvichg, curvichg;
 
 /*
  * true whilst a vi change is active causing keys to be
@@ -62,7 +62,7 @@ struct vichange lastvichg, curvichg;
  */
 
 /**/
-int vichgflag;
+__thread int vichgflag;
 
 /*
  * analogous to vichgflag for a repeated change with the value following
@@ -70,12 +70,12 @@ int vichgflag;
  */
 
 /**/
-int viinrepeat;
+__thread int viinrepeat;
 
 /* point where vi insert mode was last entered */
 
 /**/
-int viinsbegin;
+__thread int viinsbegin;
 
 /**
  * im: >= 0: is an insertmode

@@ -36,7 +36,7 @@ enum statnum { ST_DEV, ST_INO, ST_MODE, ST_NLINK, ST_UID, ST_GID,
 enum statflags { STF_NAME = 1,  STF_FILE = 2, STF_STRING = 4, STF_RAW = 8,
 		     STF_PICK = 16, STF_ARRAY = 32, STF_GMT = 64,
 		     STF_HASH = 128, STF_OCTAL = 256 };
-static char *statelts[] = { "device", "inode", "mode", "nlink",
+static __thread char *statelts[] = { "device", "inode", "mode", "nlink",
 				"uid", "gid", "rdev", "size", "atime",
 				"mtime", "ctime", "blksize", "blocks",
 				"link", NULL };
@@ -53,7 +53,7 @@ statmodeprint(mode_t mode, char *outbuf, int flags)
 	    strcat(outbuf, " (");
     }
     if (flags & STF_STRING) {
-	static const char *modes = "?rwxrwxrwx";
+	static __thread const char *modes = "?rwxrwxrwx";
 #ifdef __CYGWIN__
 	static mode_t mflags[9] = { 0 };
 #else
@@ -184,7 +184,7 @@ statgidprint(gid_t gid, char *outbuf, int flags)
     }
 }
 
-static char *timefmt;
+static __thread char *timefmt;
 
 /**/
 static void
@@ -634,18 +634,30 @@ bin_stat(char *name, char **args, Options ops, UNUSED(int func))
     return ret;
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("stat", 0, bin_stat, 0, -1, 0, NULL, NULL),
     BUILTIN("zstat", 0, bin_stat, 0, -1, 0, NULL, NULL),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

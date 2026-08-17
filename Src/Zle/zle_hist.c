@@ -34,30 +34,30 @@
  * movements and changes do this.                                   */
 
 /**/
-int lastcol;
+__thread int lastcol;
 
 /* current history line number */
 
 /**/
-int histline;
+__thread int histline;
 
 /* Previous search string use in an incremental search */
 
 /**/
-char *previous_search = NULL;
+__thread char *previous_search = NULL;
 
 /**/
-int previous_search_len;
+__thread int previous_search_len;
 
 /* Previous aborted search string use in an incremental search */
 
 /**/
-char *previous_aborted_search = NULL;
+__thread char *previous_aborted_search = NULL;
 
 /* Local keymap in isearch mode */
 
 /**/
-Keymap isearch_keymap;
+__thread Keymap isearch_keymap;
 
 /*** History text manipulation utilities ***/
 
@@ -73,7 +73,7 @@ Keymap isearch_keymap;
  * If not set, nothing to forget.
  */
 /**/
-int have_edits = 0;
+__thread int have_edits = 0;
 
 /**/
 void
@@ -449,8 +449,8 @@ downhistory(UNUSED(char **args))
  * srch_str is the metafied search string, as extracted from the start
  *   of zleline.
  */
-static int histpos, srch_hl, srch_cs = -1;
-static char *srch_str;
+static __thread int histpos, srch_hl, srch_cs = -1;
+static __thread char *srch_str;
 
 /**/
 int
@@ -618,8 +618,8 @@ insertlastword(char **args)
     LinkNode node;
     ZLE_STRING_T zs;
 
-    static char *lastinsert;
-    static int lasthist, lastpos, lastlen;
+    static __thread char *lastinsert;
+    static __thread int lasthist, lastpos, lastlen;
     int evhist;
 
     /*
@@ -946,7 +946,7 @@ historyincrementalpatternsearchforward(char **args)
     return doisearch(args, 1, 1);
 }
 
-static struct isrch_spot {
+static __thread struct isrch_spot {
     int hl;			/* This spot's histline */
     int pat_hl;			/* histline where pattern search started */
     unsigned short pos;		/* The search position in our metafied str */
@@ -959,7 +959,7 @@ static struct isrch_spot {
 #define ISS_NOMATCH_SHIFT 1
 } *isrch_spots;
 
-static int max_spot = 0;
+static __thread int max_spot = 0;
 
 /**/
 void
@@ -1076,7 +1076,7 @@ save_isearch_buffer(char *sbuf, int sbptr,
 #define FIRST_SEARCH_CHAR	(NORM_PROMPT_POS + 14)
 
 /**/
-int isearch_active, isearch_startpos, isearch_endpos;
+__thread int isearch_active, isearch_startpos, isearch_endpos;
 
 /**/
 static int
@@ -1807,8 +1807,8 @@ vifetchhistory(UNUSED(char **args))
 
 /* the last vi search */
 
-static char *visrchstr, *vipenultsrchstr;
-static int visrchsense;
+static __thread char *visrchstr, *vipenultsrchstr;
+static __thread int visrchsense;
 
 /**/
 static int

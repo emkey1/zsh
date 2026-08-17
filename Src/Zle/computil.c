@@ -90,8 +90,8 @@ struct cdset {
     int desc;                   /* number of matches with description */
 };
 
-static struct cdstate cd_state;
-static int cd_parsed = 0;
+static __thread struct cdstate cd_state;
+static __thread int cd_parsed = 0;
 
 static void
 freecdsets(Cdset p)
@@ -971,7 +971,7 @@ struct caarg {
 /* The cache of parsed descriptions. */
 
 #define MAX_CACACHE 8
-static Cadef cadef_cache[MAX_CACACHE];
+static __thread Cadef cadef_cache[MAX_CACACHE];
 
 /* Compare two arrays of strings for equality. */
 
@@ -1980,9 +1980,9 @@ struct castate {
     LinkList *oargs;	/* list of lists used for populating $opt_args */
 };
 
-static struct castate ca_laststate;
-static int ca_parsed = 0, ca_alloced = 0;
-static int ca_doff; /* no. of chars of ignored prefix (for clumped options or arg to an option) */
+static __thread struct castate ca_laststate;
+static __thread int ca_parsed = 0, ca_alloced = 0;
+static __thread int ca_doff; /* no. of chars of ignored prefix (for clumped options or arg to an option) */
 
 static void
 freecastate(Castate s)
@@ -2986,7 +2986,7 @@ struct cvval {
 /* Cache. */
 
 #define MAX_CVCACHE 8
-static Cvdef cvdef_cache[MAX_CVCACHE];
+static __thread Cvdef cvdef_cache[MAX_CVCACHE];
 
 /* Memory stuff. */
 
@@ -3262,8 +3262,8 @@ struct cvstate {
     LinkList vals;
 };
 
-static struct cvstate cv_laststate;
-static int cv_parsed = 0, cv_alloced = 0;
+static __thread struct cvstate cv_laststate;
+static __thread int cv_parsed = 0, cv_alloced = 0;
 
 /* Get the next value in the string.  Return it's definition and update the
  * sp pointer to point to the end of the value (plus argument, if any).
@@ -3790,11 +3790,11 @@ struct ctset {
 /* Array of tag-set infos. Index is the locallevel. */
 
 #define MAX_TAGS 256
-static Ctags comptags[MAX_TAGS];
+static __thread Ctags comptags[MAX_TAGS];
 
 /* locallevel at last comptags -i */
 
-static int lasttaglevel;
+static __thread int lasttaglevel;
 
 static void
 freectset(Ctset s)
@@ -5135,7 +5135,7 @@ bin_compgroups(char *nam, char **args, UNUSED(Options ops), UNUSED(int func))
     return 0;
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("comparguments", 0, bin_comparguments, 1, -1, 0, NULL, NULL),
     BUILTIN("compdescribe", 0, bin_compdescribe, 3, -1, 0, NULL, NULL),
     BUILTIN("compfiles", 0, bin_compfiles, 1, -1, 0, NULL, NULL),
@@ -5146,13 +5146,25 @@ static struct builtin bintab[] = {
     BUILTIN("compvalues", 0, bin_compvalues, 1, -1, 0, NULL, NULL)
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 
 /**/

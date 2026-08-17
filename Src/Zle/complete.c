@@ -34,15 +34,15 @@
 
 /**/
 mod_export
-zlong compcurrent,
+__thread zlong compcurrent,
       complistmax;
 /**/
-zlong complistlines,
+__thread zlong complistlines,
       compignored;
 
 /**/
 mod_export
-char **compwords,
+__thread char **compwords,
      **compredirs,
      *compprefix,
      *compsuffix,
@@ -56,7 +56,7 @@ char **compwords,
      *comppatmatch,
      *complastprompt;
 /**/
-char *compiprefix,
+__thread char *compiprefix,
      *compcontext,
      *compparameter,
      *compredirect,
@@ -81,7 +81,7 @@ char *compiprefix,
  */
 
 /**/
-Param *comprpms;
+__thread Param *comprpms;
 
 /* 
  * An array of Param structures for elements of $compstate; see
@@ -91,7 +91,7 @@ Param *comprpms;
  */
 
 /**/
-Param *compkpms;
+__thread Param *compkpms;
 
 /**/
 mod_export void
@@ -566,7 +566,7 @@ parse_class(Cpattern p, char *iptr)
     return iptr;
 }
 
-static struct { char *name; int abbrev; int oflag; } orderopts[] = {
+static __thread struct { char *name; int abbrev; int oflag; } orderopts[] = {
     { "nosort", 2, CAF_NOSORT },
     { "match", 3, CAF_MATSORT },
     { "numeric", 3, CAF_NUMSORT },
@@ -1252,14 +1252,22 @@ static const struct gsu_integer nmatches_gsu =
 { get_nmatches, NULL, compunsetfn };
 static const struct gsu_integer unambig_curs_gsu =
 { get_unambig_curs, NULL, compunsetfn };
-static const struct gsu_integer listlines_gsu =
+static __thread const struct gsu_integer listlines_gsu =
 { get_listlines, NULL, compunsetfn };
 
-static const struct gsu_array compvararray_gsu =
+static __thread const struct gsu_array compvararray_gsu =
 { arrvargetfn, arrvarsetfn, compunsetfn };
 
 
-static struct compparam comprparams[] = {
+/* AOK: comprparams's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef struct compparam aok_tt_comprparams[10];
+static __thread aok_tt_comprparams aok_tv_comprparams;
+static __thread char aok_ti_comprparams;
+static aok_tt_comprparams *aok_tf_comprparams(void) {
+    if (!aok_ti_comprparams) {
+        struct compparam aok_tmp[] = {
     { "words", PM_ARRAY, VAL(compwords), NULL },
     { "redirections", PM_ARRAY, VAL(compredirs), NULL },
     { "CURRENT", PM_INTEGER, VAL(compcurrent), NULL },
@@ -1271,8 +1279,25 @@ static struct compparam comprparams[] = {
     { "QISUFFIX", PM_SCALAR | PM_READONLY, VAL(compqisuffix), NULL },
     { NULL, 0, NULL, NULL }
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 10,
+                       "comprparams: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_comprparams, aok_tmp, sizeof(aok_tmp));
+        aok_ti_comprparams = 1;
+    }
+    return &aok_tv_comprparams;
+}
+#define comprparams (*aok_tf_comprparams())
 
-static struct compparam compkparams[] = {
+
+/* AOK: compkparams's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef struct compparam aok_tt_compkparams[27];
+static __thread aok_tt_compkparams aok_tv_compkparams;
+static __thread char aok_ti_compkparams;
+static aok_tt_compkparams *aok_tf_compkparams(void) {
+    if (!aok_ti_compkparams) {
+        struct compparam aok_tmp[] = {
     { "nmatches", PM_INTEGER | PM_READONLY, NULL, GSU(nmatches_gsu) },
     { "context", PM_SCALAR, VAL(compcontext), NULL },
     { "parameter", PM_SCALAR, VAL(compparameter), NULL },
@@ -1304,6 +1329,15 @@ static struct compparam compkparams[] = {
     { "ignored", PM_INTEGER | PM_READONLY, VAL(compignored), NULL },
     { NULL, 0, NULL, NULL }
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 27,
+                       "compkparams: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_compkparams, aok_tmp, sizeof(aok_tmp));
+        aok_ti_compkparams = 1;
+    }
+    return &aok_tv_compkparams;
+}
+#define compkparams (*aok_tf_compkparams())
+
 
 #define COMPSTATENAME "compstate"
 
@@ -1690,19 +1724,19 @@ cond_range(char **a, int id)
 			(id ? cond_str(a, 1, 1) : NULL), 0);
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("compadd", BINF_HANDLES_OPTS, bin_compadd, 0, -1, 0, NULL, NULL),
     BUILTIN("compset", 0, bin_compset, 1, 3, 0, NULL, NULL),
 };
 
-static struct conddef cotab[] = {
+static __thread struct conddef cotab[] = {
     CONDDEF("after", 0, cond_range, 1, 1, 0),
     CONDDEF("between", 0, cond_range, 2, 2, 1),
     CONDDEF("prefix", 0, cond_psfix, 1, 2, CVT_PREPAT),
     CONDDEF("suffix", 0, cond_psfix, 1, 2, CVT_SUFPAT),
 };
 
-static struct funcwrap wrapper[] = {
+static __thread struct funcwrap wrapper[] = {
     WRAPDEF(comp_wrapper),
 };
 
@@ -1710,7 +1744,7 @@ static struct funcwrap wrapper[] = {
  * macros in comp.h */
 
 /**/
-struct hookdef comphooks[] = {
+__thread struct hookdef comphooks[] = {
     HOOKDEF("insert_match", NULL, HOOKF_ALL),
     HOOKDEF("menu_start", NULL, HOOKF_ALL),
     HOOKDEF("compctl_make", NULL, 0),
@@ -1718,13 +1752,25 @@ struct hookdef comphooks[] = {
     HOOKDEF("comp_list_matches", ilistmatches, 0),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     cotab, sizeof(cotab)/sizeof(*cotab),
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

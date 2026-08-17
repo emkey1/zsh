@@ -392,6 +392,24 @@
 #define HAVE_MMAP 1
 
 /* Define to 1 if you have the 'msync' function. */
+/* iSH-AOK: LEFT DEFINED, and the reason is written here because undefining it
+   is the obvious move and it does not work.
+
+   Src/Modules/mapfile.c looks like it gates its mmap path on
+   HAVE_MMAP && HAVE_MUNMAP && HAVE_MSYNC -- but the USE_MMAP that actually
+   selects that path comes from Src/parse.epro, which defines it
+   UNCONDITIONALLY and reaches every module through zsh.mdh. So clearing this
+   removes MMAP_ARGS while leaving USE_MMAP set, and the module stops
+   compiling. (Upstream wart, not an AOK one.)
+
+   The consequence to know about: zsh/mapfile is silently broken in this build
+   and this is not what breaks it. Its MMAP_ARGS always include MAP_SHARED, and
+   the shim's mmap refuses file-backed MAP_SHARED (kernel/native_libc.c) because
+   a guest file behind AOK's VFS has no host page to share -- so a read gives ""
+   for a file the guest can cat and a write vanishes. msync is routed regardless
+   (see the .c), so nothing here reaches the host either way. Repairing the
+   module means teaching nlibc_mmap to write back, which is where msync stops
+   being a no-op; the two are coupled and that comment says so. */
 #define HAVE_MSYNC 1
 
 /* Define to 1 if you have the 'munmap' function. */
@@ -1053,6 +1071,32 @@
 
 /* Define to be location of utmpx file. */
 #define PATH_UTMPX_FILE "/var/run/utmpx"
+
+/* iSH-AOK: the file `watch` and `log` actually look at.
+   Src/Modules/watch.c derives REAL_UTMPX_FILE from the first of UTMPX_FILE,
+   _PATH_UTMPX and PATH_UTMPX_FILE that is defined -- so PATH_UTMPX_FILE above
+   is INERT here: Darwin's <utmpx.h> defines BOTH of the other two, as
+   "/var/run/utmpx", and it is included after this file, so defining either of
+   them here is overwritten before watch.c looks. The result is named directly
+   instead, which watch.c honours by testing `#if !defined(REAL_UTMPX_FILE)`
+   first. (Setting UTMPX_FILE was tried and silently lost, which is why this
+   paragraph exists.)
+
+   It has to name the guest's Linux path because dowatch() stats this file and
+   returns early unless its mtime moved, while the records themselves come from
+   the routed getutxent -- which reads /var/run/utmp (then /run/utmp) in Linux's
+   layout. Left at the Darwin name, the gate and the data were two different
+   files: no guest ships /var/run/utmpx, so `watch` never fired at all, and a
+   single `touch /var/run/utmpx` was enough to make it fire and print the
+   DEVICE's sessions.
+
+   Note what is deliberately NOT changed: PATH_WTMPX_FILE stays undefined and
+   WATCH_WTMP_FILE keeps Darwin's name. getlogtime() fopen()s the wtmp file and
+   freads it straight into a Darwin struct utmpx, with no shim call in between,
+   so pointing it at the guest's Linux-layout /var/log/wtmp would parse
+   nonsense. A name the guest does not have makes that fopen fail, and the
+   function's own fallback (time(NULL)) is correct. */
+#define REAL_UTMPX_FILE "/var/run/utmp"
 
 /* Define to be location of utmp file. */
 /* #undef PATH_UTMP_FILE */

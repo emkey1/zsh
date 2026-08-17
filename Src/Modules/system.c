@@ -280,7 +280,7 @@ bin_syswrite(char *nam, char **args, Options ops, UNUSED(int func))
 }
 
 
-static struct { const char *name; int oflag; } openopts[] = {
+static __thread struct { const char *name; int oflag; } openopts[] = {
 #ifdef O_CLOEXEC
     { "cloexec", O_CLOEXEC },
 #else
@@ -817,7 +817,7 @@ bin_zsystem(char *nam, char **args, Options ops, int func)
     return 1;
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("syserror", 0, bin_syserror, 0, 1, 0, "e:p:", NULL),
     BUILTIN("sysread", 0, bin_sysread, 0, 1, 0, "c:i:o:s:t:", NULL),
     BUILTIN("syswrite", 0, bin_syswrite, 1, 1, 0, "c:o:", NULL),
@@ -896,24 +896,36 @@ scanpmsysparams(UNUSED(HashTable ht), ScanFunc func, int flags)
     func(&spm.node, flags);
 }
 
-static struct mathfunc mftab[] = {
+static __thread struct mathfunc mftab[] = {
     NUMMATHFUNC("systell", math_systell, 1, 1, 0)
 };
 
-static struct paramdef partab[] = {
+static __thread struct paramdef partab[] = {
     SPECIALPMDEF("errnos", PM_ARRAY|PM_READONLY,
 		 &errnos_gsu, NULL, NULL),
     SPECIALPMDEF("sysparams", PM_READONLY,
 		 NULL, getpmsysparams, scanpmsysparams)
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     mftab, sizeof(mftab)/sizeof(*mftab),
     partab, sizeof(partab)/sizeof(*partab),
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /* The load/unload routines required by the zsh library interface */
 

@@ -16,7 +16,7 @@ static void ppa_unsetfn(Param pm,int explicit);
 static HashTable pph_getfn(Param pm);
 static void pph_setfn(Param pm,HashTable x);
 static void pph_unsetfn(Param pm,int explicit);
-static int private_wraplevel;
+static __thread int private_wraplevel;
 static int wrap_private(Eprog prog,FuncWrap w,char*name);
 static HashNode getprivatenode(HashTable ht,const char*nam);
 static HashNode getprivatenode2(HashTable ht,const char*nam);

@@ -218,20 +218,32 @@ bin_listattr(char *nam, char **argv, Options ops, UNUSED(int func))
 
 /* module paraphernalia */
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("zgetattr", 0, bin_getattr, 2, 3, 0, "h", NULL),
     BUILTIN("zsetattr", 0, bin_setattr, 3, 3, 0, "h", NULL),
     BUILTIN("zdelattr", 0, bin_delattr, 2, -1, 0, "h", NULL),
     BUILTIN("zlistattr", 0, bin_listattr, 1, 2, 0, "h", NULL),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

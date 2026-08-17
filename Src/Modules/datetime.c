@@ -235,7 +235,7 @@ getcurrenttime(UNUSED(Param pm))
     return arr;
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("strftime",    0, bin_strftime,    1,   3, 0, "nqrs:", NULL),
 };
 
@@ -245,10 +245,18 @@ static const struct gsu_integer epochseconds_gsu =
 static const struct gsu_float epochrealtime_gsu =
 { getcurrentrealtime, NULL, stdunsetfn };
 
-static const struct gsu_array epochtime_gsu =
+static __thread const struct gsu_array epochtime_gsu =
 { getcurrenttime, NULL, stdunsetfn };
 
-static struct paramdef patab[] = {
+/* AOK: patab's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef struct paramdef aok_tt_patab[3];
+static __thread aok_tt_patab aok_tv_patab;
+static __thread char aok_ti_patab;
+static aok_tt_patab *aok_tf_patab(void) {
+    if (!aok_ti_patab) {
+        struct paramdef aok_tmp[] = {
     SPECIALPMDEF("EPOCHSECONDS", PM_INTEGER|PM_READONLY,
 		 &epochseconds_gsu, NULL, NULL),
     SPECIALPMDEF("EPOCHREALTIME", PM_FFLOAT|PM_READONLY,
@@ -256,14 +264,35 @@ static struct paramdef patab[] = {
     SPECIALPMDEF("epochtime", PM_ARRAY|PM_READONLY,
 		 &epochtime_gsu, NULL, NULL)
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 3,
+                       "patab: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_patab, aok_tmp, sizeof(aok_tmp));
+        aok_ti_patab = 1;
+    }
+    return &aok_tv_patab;
+}
+#define patab (*aok_tf_patab())
 
-static struct features module_features = {
+
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     patab, sizeof(patab)/sizeof(*patab),
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

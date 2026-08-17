@@ -6,7 +6,7 @@
 #include "zsh.mdh"
 
 /**/
-mod_export char *sig_msg[SIGCOUNT+2] = {
+__thread mod_export char *sig_msg[SIGCOUNT+2] = {
 	"done",
 	"hangup",
 	"interrupt",
@@ -59,7 +59,7 @@ mod_export char *sig_msg[SIGCOUNT+2] = {
 };
 
 /**/
-char *sigs[SIGCOUNT+4] = {
+__thread char *sigs[SIGCOUNT+4] = {
 	"EXIT",
 	"HUP",
 	"INT",

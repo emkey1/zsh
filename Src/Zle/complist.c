@@ -49,7 +49,7 @@
  * mlines:   The number of lines in the logical array of all matches,
  *           initialised from listdat.nlines.
  */
-static int noselect, mselect, inselect, mcol, mline, mcols, mlines;
+static __thread int noselect, mselect, inselect, mcol, mline, mcols, mlines;
 /*
  * selected: Used to signal between domenucomplete() and menuselect()
  *           that a selected entry has been found.  Or something.
@@ -59,7 +59,7 @@ static int noselect, mselect, inselect, mcol, mline, mcols, mlines;
  * mscroll:  1 if the scrolling prompt is shown on screen.
  * mrestlines: The number of screen lines remaining to be processed.
  */
-static int selected, mlbeg = -1, mlend = 9999999, mscroll, mrestlines;
+static __thread int selected, mlbeg = -1, mlend = 9999999, mscroll, mrestlines;
 /*
  * mnew: 1 if a new selection menu is being displayed.
  * mlastcols: stored value of mcols for use in calculating mnew.
@@ -73,7 +73,7 @@ static int selected, mlbeg = -1, mlend = 9999999, mscroll, mrestlines;
  *         initialised from the total number of matches.  I realise this
  *         isn't very illuminating.
  */
-static int mnew, mlastcols, mlastlines, mhasstat, mfirstl, mlastm;
+static __thread int mnew, mlastcols, mlastlines, mhasstat, mfirstl, mlastm;
 /*
  * mlprinted: Used to signal the number of additional lines printed
  *            when outputting matches (as argument passing is a bit
@@ -85,12 +85,12 @@ static int mnew, mlastcols, mlastlines, mhasstat, mfirstl, mlastm;
  * mstatprinted: Indicates that the status line has now been printed,
  *               c.f. mhasstat.
  */
-static int mlprinted, molbeg = -2, mocol = 0, moline = 0, mstatprinted;
+static __thread int mlprinted, molbeg = -2, mocol = 0, moline = 0, mstatprinted;
 /*
  * mstatus: The message printed when scrolling.
  * mlistp: The message printed when merely listing.
  */
-static char *mstatus, *mlistp;
+static __thread char *mstatus, *mlistp;
 /*
  * mtab is the logical array of all matches referred to above.  It
  * contains mcols*mlines entries.  These entries contain a pointer to
@@ -99,22 +99,22 @@ static char *mstatus, *mlistp;
  *
  * mmtabp is a pointer to the selected entry in mtab.
  */
-static Cmatch **mtab, **mmtabp;
+static __thread Cmatch **mtab, **mmtabp;
 /*
  * Used to indicate that the list has changed and needs redisplaying.
  */
-static int mtab_been_reallocated;
+static __thread int mtab_been_reallocated;
 /*
  * Array and pointer for the match group in exactly the same layout
  * as mtab and mmtabp.
  */
-static Cmgroup *mgtab, *mgtabp;
+static __thread Cmgroup *mgtab, *mgtabp;
 #ifdef DEBUG
 /*
  * Allow us to keep track of pointer arithmetic for mgtab; could
  * just as well have been for mtab but wasn't.
  */
-static int mgtabsize;
+static __thread int mgtabsize;
 #endif
 
 /*
@@ -136,16 +136,16 @@ static int mgtabsize;
 
 #define MAX_POS 11
 
-static int nrefs;
-static int begpos[MAX_POS], curisbeg;
-static int endpos[MAX_POS];
-static int sendpos[MAX_POS], curissend; /* sorted end positions */
-static char **patcols, *curiscols[MAX_POS];
-static int curiscol;
+static __thread int nrefs;
+static __thread int begpos[MAX_POS], curisbeg;
+static __thread int endpos[MAX_POS];
+static __thread int sendpos[MAX_POS], curissend; /* sorted end positions */
+static __thread char **patcols, *curiscols[MAX_POS];
+static __thread int curiscol;
 
 /* The last color used. */
 
-static char *last_cap;
+static __thread char *last_cap;
 
 
 /* We use the parameters ZLS_COLORS and ZLS_COLOURS in the same way as
@@ -156,11 +156,11 @@ static char *last_cap;
 /*
  * menu-select widget: used to test if it's already loaded.
  */
-static Widget w_menuselect;
+static __thread Widget w_menuselect;
 /*
  * Similarly for the menuselect and listscroll keymaps.
  */
-static Keymap mskeymap, lskeymap;
+static __thread Keymap mskeymap, lskeymap;
 
 /* Indixes into the terminal string arrays. */
 
@@ -194,7 +194,7 @@ static Keymap mskeymap, lskeymap;
 
 /* Names of the terminal strings. */
 
-static char *colnames[] = {
+static __thread char *colnames[] = {
     "no", "fi", "di", "ln", "pi", "so", "bd", "cd", "or", "mi",
     "su", "sg", "tw", "ow", "st", "ex",
     "lc", "rc", "ec", "tc", "sp", "ma", "hi", "du", "sa", NULL
@@ -202,7 +202,7 @@ static char *colnames[] = {
 
 /* Default values. */
 
-static char *defcols[] = {
+static __thread char *defcols[] = {
     "0", "0", "1;31", "1;36", "33", "1;35", "1;33", "1;33", NULL, NULL,
     "37;41", "30;43", "30;42", "34;42", "37;44", "1;32", 
     "\033[", "m", NULL, "0", "0", "7", NULL, NULL, "0"
@@ -262,11 +262,11 @@ struct listcols {
  * Sometimes mcolors is passed as an argument even though it's
  * available to all the functions.
  */
-static struct listcols mcolors;
+static __thread struct listcols mcolors;
 
 /* Combined length of LC and RC, maximum length of capability strings. */
 
-static int lr_caplen, max_caplen;
+static __thread int lr_caplen, max_caplen;
 
 /* This parses the value of a definition (the part after the `=').
  * The return value is a pointer to the character after it. */
@@ -994,7 +994,7 @@ putfilecol(char *group, char *filename, mode_t m, int special)
     return 0;
 }
 
-static Cmgroup last_group;
+static __thread Cmgroup last_group;
 
 /**/
 static int
@@ -1366,11 +1366,11 @@ compzputs(char const *s, int ml)
 static int
 compprintlist(int showall)
 {
-    static int lasttype = 0, lastbeg = 0, lastml = 0, lastinvcount = -1;
-    static int lastn = 0, lastnl = 0, lastnlnct = -1;
-    static Cmgroup lastg = NULL;
-    static Cmatch *lastp = NULL;
-    static Cexpl *lastexpl = NULL;
+    static __thread int lasttype = 0, lastbeg = 0, lastml = 0, lastinvcount = -1;
+    static __thread int lastn = 0, lastnl = 0, lastnlnct = -1;
+    static __thread Cmgroup lastg = NULL;
+    static __thread Cmatch *lastp = NULL;
+    static __thread Cexpl *lastexpl = NULL;
 
     Cmgroup g;
     Cmatch *p, m;
@@ -1989,8 +1989,8 @@ singledraw(void)
 static int
 complistmatches(UNUSED(Hookdef dummy), Chdata dat)
 {
-    static int onlnct = -1;
-    static int extendedglob;
+    static __thread int onlnct = -1;
+    static __thread int extendedglob;
 
     Cmgroup oamatches = amatches;
 
@@ -2258,9 +2258,9 @@ setmstatus(char *status, char *sline, int sll, int scs,
     return ret;
 }
 
-static Menusearch msearchstack;
-static char *msearchstr = NULL;
-static int msearchstate;
+static __thread Menusearch msearchstack;
+static __thread char *msearchstr = NULL;
+static __thread int msearchstate;
 
 static void
 msearchpush(Cmatch **p, int back)
@@ -2382,8 +2382,8 @@ msearch(Cmatch **ptr, char *ins, int back, int rep, int *wrapp)
 static int
 domenuselect(Hookdef dummy, Chdata dat)
 {
-    static Chdata fdat = NULL;
-    static char *lastsearch = NULL;
+    static __thread Chdata fdat = NULL;
+    static __thread char *lastsearch = NULL;
     Cmatch **p;
     Cmgroup *pg;
     Thingy cmd = 0;
@@ -3515,7 +3515,7 @@ menuselect(char **args)
     return 0;
 }
 
-static struct features module_features = {
+static __thread struct features module_features = {
     NULL, 0,
     NULL, 0,
     NULL, 0,

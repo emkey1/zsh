@@ -33,7 +33,7 @@
 #define LF_ARRAY	1
 
 /**/
-char nulstring[] = {Nularg, '\0'};
+__thread char nulstring[] = {Nularg, '\0'};
 
 /* Check for array assignent with entries like [key]=val.
  *
@@ -56,8 +56,8 @@ keyvalpairelement(LinkList list, LinkNode node)
 	/* ..]=value or ]+=Value */
 	(end[1] == Equals ||
 	 (end[1] == '+' && end[2] == Equals))) {
-	static char marker[2] = { Marker, '\0' };
-	static char marker_plus[3] = { Marker, '+', '\0' };
+	static __thread char marker[2] = { Marker, '\0' };
+	static __thread char marker_plus[3] = { Marker, '+', '\0' };
 	*end = '\0';
 
 	dat = start + 1;

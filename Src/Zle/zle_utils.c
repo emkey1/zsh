@@ -33,32 +33,32 @@
 /* Primary cut buffer */
 
 /**/
-struct cutbuffer cutbuf;
+__thread struct cutbuffer cutbuf;
 
 /* Emacs-style kill buffer ring */
 
 /**/
-struct cutbuffer *kring;
+__thread struct cutbuffer *kring;
 /**/
-int kringsize, kringnum;
+__thread int kringsize, kringnum;
 
 /* Vi named cut buffers.  0-25 are the named buffers "a to "z, and *
  * 26-35 are the numbered buffer stack "0 to "9.                   */
 
 /**/
-struct cutbuffer vibuf[36];
+__thread struct cutbuffer vibuf[36];
 
 /* the line before last mod (for undo purposes) */
 
 /**/
-ZLE_STRING_T lastline;
+__thread ZLE_STRING_T lastline;
 /**/
-int lastlinesz, lastll, lastcs;
+__thread int lastlinesz, lastll, lastcs;
 
 /* size of line buffer */
 
 /**/
-int linesz;
+__thread int linesz;
 
 /* make sure that the line buffer has at least sz chars */
 
@@ -611,7 +611,7 @@ struct zle_position {
 };
 
 /* LIFO stack of positions */
-static struct zle_position *zle_positions;
+static __thread struct zle_position *zle_positions;
 
 /*
  * Save positions including cursor, end-of-line and
@@ -1431,22 +1431,22 @@ handlesuffix(UNUSED(char **args))
 /* head of the undo list, and the current position */
 
 /**/
-struct change *curchange;
+__thread struct change *curchange;
 
-static struct change *changes;
+static __thread struct change *changes;
 
 /* list of pending changes, not yet in the undo system */
 
-static struct change *nextchanges, *endnextchanges;
+static __thread struct change *nextchanges, *endnextchanges;
 
 /* incremented to provide a unique change number */
 
 /**/
-zlong undo_changeno;
+__thread zlong undo_changeno;
 
 /* If positive, don't undo beyond this point */
 
-static zlong undo_limitno;
+static __thread zlong undo_limitno;
 
 /**/
 void

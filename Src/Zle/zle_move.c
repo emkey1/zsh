@@ -30,7 +30,7 @@
 #include "zle.mdh"
 #include "zle_move.pro"
 
-static int vimarkcs[27], vimarkline[27];
+static __thread int vimarkcs[27], vimarkline[27];
 
 #ifdef MULTIBYTE_SUPPORT
 /*
@@ -733,8 +733,8 @@ vibeginningofline(UNUSED(char **args))
     return 0;
 }
 
-static ZLE_INT_T vfindchar;
-static int vfinddir, tailadd;
+static __thread ZLE_INT_T vfindchar;
+static __thread int vfinddir, tailadd;
 
 /**/
 int

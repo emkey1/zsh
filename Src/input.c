@@ -78,27 +78,27 @@
 /* the shell input fd */
 
 /**/
-int SHIN;
+__thread int SHIN;
 
 /* != 0 means we are reading input from a string */
  
 /**/
-int strin;
+__thread int strin;
  
 /* total # of characters waiting to be read. */
 
 /**/
-mod_export int inbufct;
+__thread mod_export int inbufct;
 
 /* the flags controlling the input routines in input.c: see INP_* in zsh.h */
 
 /**/
-int inbufflags;
+__thread int inbufflags;
 
-static char *inbuf;		/* Current input buffer */
-static char *inbufptr;		/* Pointer into input buffer */
-static char *inbufpush;		/* Character at which to re-push alias */
-static int inbufleft;		/* Characters left in current input
+static __thread char *inbuf;		/* Current input buffer */
+static __thread char *inbufptr;		/* Pointer into input buffer */
+static __thread char *inbufpush;		/* Character at which to re-push alias */
+static __thread int inbufleft;		/* Characters left in current input
 				   stack element */
 
 
@@ -111,7 +111,7 @@ struct instacks {
     Alias alias;
     int bufleft, bufct, flags;
 };
-static struct instacks *instack, *instacktop;
+static __thread struct instacks *instack, *instacktop;
 /*
  * Input stack size.  We need to push the stack for aliases, history
  * expansion, and reading from internal strings: only if these operations
@@ -122,20 +122,20 @@ static struct instacks *instack, *instacktop;
 #define INSTACK_INITIAL	4
 #define INSTACK_EXPAND	4
 
-static int instacksz = INSTACK_INITIAL;
+static __thread int instacksz = INSTACK_INITIAL;
 
 /* Size of buffer for non-interactive command input */
 
 #define SHINBUFSIZE 8192
 
 /* Input buffer for non-interactive command input */
-static char *shinbuffer;
+static __thread char *shinbuffer;
 
 /* Pointer into shinbuffer */
-static char *shinbufptr;
+static __thread char *shinbufptr;
 
 /* End of contents read into shinbuffer */
-static char *shinbufendptr;
+static __thread char *shinbufendptr;
 
 /* Entry on SHIN buffer save stack */
 struct shinsaveentry {
@@ -150,7 +150,7 @@ struct shinsaveentry {
 };
 
 /* SHIN buffer save stack */
-static struct shinsaveentry *shinsavestack;
+static __thread struct shinsaveentry *shinsavestack;
 
 /* Reset the input buffer for SHIN, discarding any pending input */
 

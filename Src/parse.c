@@ -33,20 +33,20 @@
 /* != 0 if we are about to read a command word */
 
 /**/
-mod_export int incmdpos;
+__thread mod_export int incmdpos;
 
 /**/
-int aliasspaceflag;
+__thread int aliasspaceflag;
 
 /* != 0 if we are in the middle of a [[ ... ]] */
  
 /**/
-mod_export int incond;
+__thread mod_export int incond;
  
 /* != 0 if we are after a redirection (for ctxtlex only) */
  
 /**/
-mod_export int inredir;
+__thread mod_export int inredir;
  
 /*
  * 1 if we are about to read a case pattern
@@ -55,33 +55,33 @@ mod_export int inredir;
  */
  
 /**/
-int incasepat;
+__thread int incasepat;
  
 /* != 0 if we just read a newline */
  
 /**/
-int isnewlin;
+__thread int isnewlin;
 
 /* != 0 if we are after a for keyword */
 
 /**/
-int infor;
+__thread int infor;
 
 /* != 0 if we are after a repeat keyword; if it's nonzero it's a 1-based index
  * of the current token from the last-seen command position */
 
 /**/
-int inrepeat_; /* trailing underscore because of name clash with Zle/zle_vi.c */
+__thread int inrepeat_; /* trailing underscore because of name clash with Zle/zle_vi.c */
 
 /* != 0 if parsing arguments of typeset etc. */
 
 /**/
-mod_export int intypeset;
+__thread mod_export int intypeset;
 
 /* list of here-documents */
 
 /**/
-struct heredocs *hdocs;
+__thread struct heredocs *hdocs;
  
 
 #define YYERROR(O)  { tok = LEXERR; ecused = (O); return 0; }
@@ -266,23 +266,23 @@ struct heredocs *hdocs;
  */
 
 /* Number of wordcodes allocated. */
-static int eclen;
+static __thread int eclen;
 /* Number of wordcodes populated. */
-static int ecused;
+static __thread int ecused;
 /* Number of patterns... */
-static int ecnpats;
+static __thread int ecnpats;
 
-static Wordcode ecbuf;
+static __thread Wordcode ecbuf;
 
-static Eccstr ecstrs;
+static __thread Eccstr ecstrs;
 
-static int ecsoffs, ecssub;
+static __thread int ecsoffs, ecssub;
 
 /*
  * ### The number of starts and ends of function definitions up to this point.
  * Never decremented.
  */
-static int ecnfunc;
+static __thread int ecnfunc;
 
 #define EC_INIT_SIZE         256
 #define EC_DOUBLE_THRESHOLD  32768
@@ -1035,7 +1035,7 @@ par_cmd(int *cmplx, int zsh_construct)
 	break;
     case TIME:
 	{
-	    static int inpartime = 0;
+	    static __thread int inpartime = 0;
 
 	    if (!inpartime) {
 		*cmplx = 1;
@@ -2206,7 +2206,7 @@ par_simple(int *cmplx, int nr)
  * Return number of code words required for redirection
  */
 
-static int redirtab[TRINANG - OUTANG + 1] = {
+static __thread int redirtab[TRINANG - OUTANG + 1] = {
     REDIR_WRITE,
     REDIR_WRITENOW,
     REDIR_APP,
@@ -2396,7 +2396,7 @@ par_nl_wordlist(void)
  */
 
 /**/
-void (*condlex) (void) = zshlex;
+__thread void (*condlex) (void) = zshlex;
 
 /*
  * cond	: cond_1 { SEPER } [ DBAR { SEPER } cond ]
@@ -2642,7 +2642,7 @@ par_cond_double(char *a, char *b)
 static int
 get_cond_num(char *tst)
 {
-    static char *condstrs[] =
+    static __thread char *condstrs[] =
     {
 	"nt", "ot", "ef", "eq", "ne", "lt", "gt", "le", "ge", NULL
     };
@@ -2854,7 +2854,7 @@ freeeprog(Eprog p)
 char *
 ecgetstr(Estate s, int dup, int *tokflag)
 {
-    static char buf[4];
+    static __thread char buf[4];
     wordcode c = *s->pc++;
     char *r;
 
@@ -2890,7 +2890,7 @@ ecgetstr(Estate s, int dup, int *tokflag)
 char *
 ecrawstr(Eprog p, Wordcode pc, int *tokflag)
 {
-    static char buf[4];
+    static __thread char buf[4];
     wordcode c = *pc;
 
     if (c == 6 || c == 7) {
@@ -3060,9 +3060,9 @@ eccopyredirs(Estate s)
 }
 
 /**/
-mod_export struct eprog dummy_eprog;
+__thread mod_export struct eprog dummy_eprog;
 
-static wordcode dummy_eprog_code;
+static __thread wordcode dummy_eprog_code;
 
 /**/
 void
@@ -3649,7 +3649,7 @@ build_cur_dump(char *nam, char *dump, char **names, int match, int map,
 
 /* List of dump files mapped. */
 
-static FuncDump dumps;
+static __thread FuncDump dumps;
 
 /**/
 static int
@@ -3679,7 +3679,7 @@ load_dump_file(char *dump, struct stat *sbuf, int other, int len)
     int fd, off, mlen;
 
     if (other) {
-	static size_t pgsz = 0;
+	static __thread size_t pgsz = 0;
 
 	if (!pgsz) {
 

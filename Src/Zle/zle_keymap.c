@@ -121,28 +121,28 @@ struct remprefstate {
 /* currently selected keymap, and its name */
 
 /**/
-Keymap curkeymap, localkeymap;
+__thread Keymap curkeymap, localkeymap;
 /**/
-mod_export char *curkeymapname;
+__thread mod_export char *curkeymapname;
 
 /* the hash table of keymap names */
 
 /**/
-mod_export HashTable keymapnamtab;
+__thread mod_export HashTable keymapnamtab;
 
 /* key sequence reading data */
 
 /**/
-char *keybuf;
+__thread char *keybuf;
 
 /**/
-int keybuflen;
+__thread int keybuflen;
 
-static int keybufsz = 20;
+static __thread int keybufsz = 20;
 
 /* last command executed with execute-named-command */
 
-static Thingy lastnamed;
+static __thread Thingy lastnamed;
 
 /**********************************/
 /* hashtable management functions */
@@ -216,7 +216,7 @@ refkeymap_by_name(KeymapName kmn)
 /*
  * Communication to keymap scanner when looking for a new primary name.
  */
-static Keymap km_rename_me;
+static __thread Keymap km_rename_me;
 
 /* Find a new primary name for a keymap.  See below. */
 
@@ -323,7 +323,7 @@ freekeynode(HashNode hn)
 /* main keymap operations */
 /**************************/
 
-static HashTable copyto;
+static __thread HashTable copyto;
 
 /**/
 mod_export Keymap
@@ -371,10 +371,10 @@ deletekeymap(Keymap km)
     zfree(km, sizeof(*km));
 }
 
-static Keymap skm_km;
-static int skm_last;
-static KeyScanFunc skm_func;
-static void *skm_magic;
+static __thread Keymap skm_km;
+static __thread int skm_last;
+static __thread KeyScanFunc skm_func;
+static __thread void *skm_magic;
 
 /**/
 void
@@ -1240,7 +1240,7 @@ cleanup_keymaps(void)
     zfree(keybuf, keybufsz);
 }
 
-static char *cursorptr;
+static __thread char *cursorptr;
 
 /* utility function for termcap output routine to add to string */
 
@@ -1506,7 +1506,7 @@ getrestchar_keybuf(void)
     char c;
     wchar_t outchar;
     int inchar, timeout, bufind = 0, buflen = keybuflen;
-    static mbstate_t mbs;
+    static __thread mbstate_t mbs;
     size_t cnt;
 
     /*

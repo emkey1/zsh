@@ -100,10 +100,10 @@ struct gmatch {
 #define GS_LINKED (GS_NORMAL << GS_SHIFT)
 
 /**/
-int badcshglob;
+__thread int badcshglob;
 
 /**/
-int pathpos;		/* position in pathbuf (needed by pattern code) */
+__thread int pathpos;		/* position in pathbuf (needed by pattern code) */
 
 /*
  * pathname buffer (needed by pattern code).
@@ -112,7 +112,7 @@ int pathpos;		/* position in pathbuf (needed by pattern code) */
  */
 
 /**/
-char *pathbuf;
+__thread char *pathbuf;
 
 typedef struct stat *Statptr;	 /* This makes the Ultrix compiler happy.  Go figure. */
 
@@ -150,7 +150,7 @@ struct qual {
 /* Prefix, suffix for doing zle trickery */
 
 /**/
-mod_export char *glob_pre, *glob_suf;
+__thread mod_export char *glob_pre, *glob_suf;
 
 /* Element of a glob sort */
 struct globsort {
@@ -194,7 +194,7 @@ struct globdata {
 
 /* The variable with the current globbing state and convenience macros */
 
-static struct globdata curglobdata;
+static __thread struct globdata curglobdata;
 
 #define matchsz       (curglobdata.gd_matchsz)
 #define matchct       (curglobdata.gd_matchct)
@@ -337,7 +337,7 @@ statfullpath(const char *s, struct stat *st, int l)
 /* This may be set by qualifier functions to an array of strings to insert
  * into the list instead of the original string. */
 
-static char **inserts;
+static __thread char **inserts;
 
 /* add a match to the list */
 
@@ -1202,7 +1202,7 @@ checkglobqual(char *str, int sl, int nobareglob, char **sp)
 }
 
 /* notify zglob() that it is called from expandredir() */
-static int in_expandredir = 0;
+static __thread int in_expandredir = 0;
 
 /* Main entry point to the globbing code for filename globbing. *
  * np points to a node in the list which will be expanded  *
@@ -3942,7 +3942,7 @@ qualsheval(char *name, UNUSED(struct stat *buf), UNUSED(off_t days), char *str)
 	    char *tmp;
 
 	    if ((tmp = getsparam("reply")) || (tmp = getsparam("REPLY"))) {
-		static char *tmparr[2];
+		static __thread char *tmparr[2];
 
 		tmparr[0] = tmp;
 		tmparr[1] = NULL;

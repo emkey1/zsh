@@ -205,10 +205,10 @@ get_contents(char *fname)
     return val;
 }
 
-static const struct gsu_scalar mapfile_gsu =
+static __thread const struct gsu_scalar mapfile_gsu =
 { strgetfn, setpmmapfile, unsetpmmapfile };
 
-static struct paramdef partab[] = {
+static __thread struct paramdef partab[] = {
     SPECIALPMDEF("mapfile", 0, &mapfiles_gsu, getpmmapfile, scanpmmapfile)
 };
 
@@ -266,13 +266,25 @@ scanpmmapfile(UNUSED(HashTable ht), ScanFunc func, int flags)
     closedir(dir);
 }
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     NULL, 0,
     NULL, 0,
     NULL, 0,
     partab, sizeof(partab)/sizeof(*partab),
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

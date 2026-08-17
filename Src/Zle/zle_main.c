@@ -40,48 +40,48 @@
 /* The input line assembled so far */
 
 /**/
-mod_export ZLE_STRING_T zleline;
+__thread mod_export ZLE_STRING_T zleline;
 
 /* Cursor position and line length in zle */
 
 /**/
-mod_export int zlecs, zlell;
+__thread mod_export int zlecs, zlell;
 
 /* != 0 if in a shell function called from completion, such that read -[cl]  *
  * will work (i.e., the line is metafied, and the above word arrays are OK). */
 
 /**/
-mod_export int incompctlfunc;
+__thread mod_export int incompctlfunc;
 
 /* != 0 if completion module is loaded */
 
 /**/
-mod_export int hascompmod;
+__thread mod_export int hascompmod;
 
 /* Increment for each nested recursive-edit */
 
 /**/
-mod_export int zle_recursive;
+__thread mod_export int zle_recursive;
 
 /* ZLRF_* flags passed to zleread() */
 
 /**/
-int zlereadflags;
+__thread int zlereadflags;
 
 /* ZLCON_* flags passed to zleread() */
 
 /**/
-int zlecontext;
+__thread int zlecontext;
 
 /* != 0 if we're done editing */
 
 /**/
-int done;
+__thread int done;
 
 /* location of mark */
 
 /**/
-int mark;
+__thread int mark;
 
 /*
  * Status ($?) saved before function entry.  This is the
@@ -89,7 +89,7 @@ int mark;
  */
 
 /**/
-static int pre_zle_status;
+static __thread int pre_zle_status;
 
 /*
  * Last character pressed.
@@ -107,69 +107,69 @@ static int pre_zle_status;
 
 /**/
 mod_export int
-lastchar;
+__thread lastchar;
 #ifdef MULTIBYTE_SUPPORT
 /**/
-mod_export ZLE_INT_T lastchar_wide;
+__thread mod_export ZLE_INT_T lastchar_wide;
 /**/
 mod_export int
-lastchar_wide_valid;
+__thread lastchar_wide_valid;
 #endif
 
 /* the bindings for the previous and for this key */
 
 /**/
-mod_export Thingy lbindk, bindk;
+__thread mod_export Thingy lbindk, bindk;
 
 /* insert mode/overwrite mode flag */
 
 /**/
-int insmode;
+__thread int insmode;
 
-static int eofchar;
+static __thread int eofchar;
 
-static int eofsent;
+static __thread int eofsent;
 /*
  * Key timeout in hundredths of a second:  we use time_t so
  * that we only have the limits on one integer type to worry about.
  */
-static time_t keytimeout;
+static __thread time_t keytimeout;
 
 #if defined(HAVE_SELECT) || defined(HAVE_POLL)
 /* Terminal baud rate */
 
-static int baud;
-static long costmult;
+static __thread int baud;
+static __thread long costmult;
 #endif
 
 /* flags associated with last command */
 
 /**/
-mod_export int lastcmd;
+__thread mod_export int lastcmd;
 
 /**/
-mod_export Widget compwidget;
+__thread mod_export Widget compwidget;
 
 /* the status line, a null-terminated metafied string */
 
 /**/
-mod_export char *statusline;
+__thread mod_export char *statusline;
 
 /* The current history line and cursor position for the top line *
  * on the buffer stack.                                          */
 
 /**/
-int stackhist, stackcs;
+__thread int stackhist, stackcs;
 
 /* position in undo stack from when the current vi change started */
 
 /**/
-zlong vistartchange;
+__thread zlong vistartchange;
 
 /* current modifier status */
 
 /**/
-mod_export struct modifier zmod;
+__thread mod_export struct modifier zmod;
 
 /* Current command prefix status.  This is normally 0.  Prefixes set *
  * this to 1.  Each time round the main loop, this is checked: if it *
@@ -180,28 +180,28 @@ mod_export struct modifier zmod;
  * modifiers.                                                        */
 
 /**/
-int prefixflag;
+__thread int prefixflag;
 
 /* Number of characters waiting to be read by the ungetbytes mechanism */
 /**/
-int kungetct;
+__thread int kungetct;
 
 /**/
-mod_export char *zlenoargs[1] = { NULL };
+__thread mod_export char *zlenoargs[1] = { NULL };
 
-static char **raw_lp, **raw_rp;
+static __thread char **raw_lp, **raw_rp;
 
 /*
  * File descriptors we are watching as well as the terminal fd. 
  * These are all for reading; we don't watch for writes or exceptions.
  */
 /**/
-int nwatch;		/* Number of fd's we are watching */
+__thread int nwatch;		/* Number of fd's we are watching */
 /*
  * Array of nwatch structures.
  */
 /**/
-Watch_fd watch_fds;
+__thread Watch_fd watch_fds;
 
 /* set up terminal */
 
@@ -333,8 +333,8 @@ zsetterm(void)
     settyinfo(&ti);
 }
 
-static char *kungetbuf;
-static int kungetsz;
+static __thread char *kungetbuf;
+static __thread int kungetsz;
 
 /*
  * Note on ungetbyte and ungetbytes for the confused (pws):
@@ -992,7 +992,7 @@ getrestchar(int inchar, char *outstr, int *outcount)
     char c = inchar;
     wchar_t outchar;
     int timeout;
-    static mbstate_t mbs;
+    static __thread mbstate_t mbs;
 
     /*
      * We are guaranteed to set a valid wide last character,
@@ -1669,7 +1669,7 @@ restorekeymap(char *cmdname, char *oldname, char *newname, Keymap savemap)
 /* this exports the argument we are currently vared'iting if != NULL */
 
 /**/
-mod_export char *varedarg;
+__thread mod_export char *varedarg;
 
 /* vared: edit (literally) a parameter value */
 
@@ -1999,8 +1999,8 @@ recursiveedit(UNUSED(char **args))
 void
 reexpandprompt(void)
 {
-    static int reexpanding;
-    static int looping;
+    static __thread int reexpanding;
+    static __thread int looping;
 
     if (!reexpanding++) {
 	const char **markers = prompt_markers();
@@ -2214,7 +2214,7 @@ zle_main_entry(int cmd, va_list ap)
     return NULL;
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("bindkey", 0, bin_bindkey, 0, -1, 0, "evaM:ldDANmrsLRp", NULL),
     BUILTIN("vared",   0, bin_vared,   1,  1, 0, "aAcef:ghi:M:m:p:r:t:", NULL),
     BUILTIN("zle",     0, bin_zle,     0, -1, 0, "aAcCDfFgGIKlLmMNrRTUw", NULL),
@@ -2224,7 +2224,7 @@ static struct builtin bintab[] = {
  * macros in zle.h */
 
 /**/
-mod_export struct hookdef zlehooks[] = {
+__thread mod_export struct hookdef zlehooks[] = {
     /* LISTMATCHESHOOK */
     HOOKDEF("list_matches", NULL, 0),
     /* COMPLETEHOOK */
@@ -2239,13 +2239,25 @@ mod_export struct hookdef zlehooks[] = {
     HOOKDEF("invalidate_list", NULL, 0),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

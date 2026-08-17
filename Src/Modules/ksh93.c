@@ -37,7 +37,7 @@
  * Standard module configuration/linkage
  */
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("nameref", BINF_ASSIGN, (HandlerFunc)bin_typeset, 0, -1, 0, "gpru", "n")
 };
 
@@ -102,21 +102,35 @@ static const struct gsu_array sh_match_gsu =
     { matchgetfn, arrsetfn, stdunsetfn };
 static const struct gsu_scalar sh_name_gsu =
     { strvargetfn, nullstrsetfn, nullunsetfn };
-static const struct gsu_scalar sh_subscript_gsu =
+static __thread const struct gsu_scalar sh_subscript_gsu =
     { strvargetfn, nullstrsetfn, nullunsetfn };
 
 static char sh_unsetval[2];	/* Dummy to treat as NULL */
-static char *sh_name = sh_unsetval;
-static char *sh_subscript = sh_unsetval;
-static char *sh_edchar = sh_unsetval;
-static char sh_edmode[2];
+				/* AOK: deliberately NOT __thread. It is a
+				   never-written sentinel whose ADDRESS is the
+				   value; three thread-locals below are
+				   initialised with it, and the address of a
+				   thread-local is not a constant expression.
+				   Listed in bash-tls-fix-externs.py's ALLOW. */
+static __thread char *sh_name = sh_unsetval;
+static __thread char *sh_subscript = sh_unsetval;
+static __thread char *sh_edchar = sh_unsetval;
+static __thread char sh_edmode[2];
 
 /*
  * Some parameters listed here do not appear in ksh93.mdd autofeatures
  * because they are only instantiated by ksh93_wrapper() below.  This
  * obviously includes those commented out here.
  */
-static struct paramdef partab[] = {
+/* AOK: partab's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef struct paramdef aok_tt_partab[9];
+static __thread aok_tt_partab aok_tv_partab;
+static __thread char aok_ti_partab;
+static aok_tt_partab *aok_tf_partab(void) {
+    if (!aok_ti_partab) {
+        struct paramdef aok_tmp[] = {
     PARAMDEF(".sh.edchar", PM_SCALAR|PM_SPECIAL,
 	     &sh_edchar, &sh_edchar_gsu),
     PARAMDEF(".sh.edmode", PM_SCALAR|PM_READONLY|PM_SPECIAL,
@@ -132,14 +146,35 @@ static struct paramdef partab[] = {
     /* SPECIALPMDEF(".sh.value", 0, NULL, NULL, NULL), */
     PARAMDEF(".sh.version", PM_NAMEREF|PM_READONLY, "ZSH_PATCHLEVEL", &constant_gsu)
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 9,
+                       "partab: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_partab, aok_tmp, sizeof(aok_tmp));
+        aok_ti_partab = 1;
+    }
+    return &aok_tv_partab;
+}
+#define partab (*aok_tf_partab())
 
-static struct features module_features = {
+
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     partab, sizeof(partab)/sizeof(*partab),
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 static int
@@ -189,8 +224,8 @@ ksh93_wrapper(Eprog prog, FuncWrap w, char *name)
 	setiparam(".sh.level", num);
     }
     if (zleactive) {
-	extern mod_import_variable char *curkeymapname;	/* XXX */
-	extern mod_import_variable char *varedarg;	/* XXX */
+	__thread extern mod_import_variable char *curkeymapname;	/* XXX */
+	__thread extern mod_import_variable char *varedarg;	/* XXX */
 	/* bindkey -v forces VIMODE so this test is as good as any */
 	if (curkeymapname && isset(VIMODE) &&
 	    strcmp(curkeymapname, "main") == 0)
@@ -229,7 +264,7 @@ ksh93_wrapper(Eprog prog, FuncWrap w, char *name)
     return 1;
 }
 
-static struct funcwrap wrapper[] = {
+static __thread struct funcwrap wrapper[] = {
     WRAPDEF(ksh93_wrapper),
 };
 

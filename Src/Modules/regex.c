@@ -210,18 +210,30 @@ CLEAN_BASEMETA:
     return return_value;
 }
 
-static struct conddef cotab[] = {
+static __thread struct conddef cotab[] = {
     CONDDEF("regex-match", CONDF_INFIX, zcond_regex_match, 0, 0, ZREGEX_EXTENDED)
 };
 
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     NULL, 0,
     cotab, sizeof(cotab)/sizeof(*cotab),
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 
 /**/

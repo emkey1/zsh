@@ -2,10 +2,13 @@
 #ifndef have_Src_Zle_zle_bindings_globals
 #define have_Src_Zle_zle_bindings_globals
 
-extern mod_import_variable struct thingy thingies[];
-extern int emacsbind[32];
-extern int metabind[128];
-extern int viinsbind[32];
-extern int vicmdbind[128];
+/* AOK: thingies[] is no longer a variable -- it is a macro for a per-shell
+   accessor declared in zle.h, so there is nothing to declare extern here.
+   The `/**' marker that made makepro emit this line is gone from
+   zle_bindings.c too, so regenerating this file will not bring it back. */
+__thread extern int emacsbind[32];
+__thread extern int metabind[128];
+__thread extern int viinsbind[32];
+__thread extern int vicmdbind[128];
 
 #endif /* !have_Src_Zle_zle_bindings_globals */

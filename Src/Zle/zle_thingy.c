@@ -49,7 +49,7 @@
 /* Hashtable of thingies.  Enabled nodes are those that refer to widgets. */
 
 /**/
-mod_export HashTable thingytab;
+__thread mod_export HashTable thingytab;
 
 /**********************************/
 /* hashtable management functions */
@@ -815,7 +815,7 @@ cleanup_zle_call:
  */
 
 /**/
-int fetchttyinfo;
+__thread int fetchttyinfo;
 
 /**/
 static int

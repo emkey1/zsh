@@ -33,6 +33,7 @@
 #include "zshxmods.h"
 
 #include "init.pro"
+#include "aok_fork.h"
 
 #include "version.h"
 #ifdef CUSTOM_PATCHLEVEL
@@ -49,65 +50,65 @@
 #endif
 
 /**/
-int noexitct = 0;
+__thread int noexitct = 0;
 
 /* buffer for $_ and its length */
 
 /**/
-char *zunderscore;
+__thread char *zunderscore;
 
 /**/
-size_t underscorelen;
+__thread size_t underscorelen;
 
 /**/
-int underscoreused;
+__thread int underscoreused;
 
 /* what level of sourcing we are at */
  
 /**/
-int sourcelevel;
+__thread int sourcelevel;
 
 /* the shell tty fd */
 
 /**/
-mod_export int SHTTY;
+__thread mod_export int SHTTY;
 
 /* the FILE attached to the shell tty */
 
 /**/
-mod_export FILE *shout;
+__thread mod_export FILE *shout;
 
 /* termcap strings */
  
 /**/
-mod_export char *tcstr[TC_COUNT];
+__thread mod_export char *tcstr[TC_COUNT];
 
 /* lengths of each termcap string */
  
 /**/
-mod_export int tclen[TC_COUNT];
+__thread mod_export int tclen[TC_COUNT];
 
 /* Values of the li, co and am entries */
 
 /**/
-int tclines, tccolumns;
+__thread int tclines, tccolumns;
 /**/
-mod_export int hasam;
+__thread mod_export int hasam;
 /**/
-int hasxn;
+__thread int hasxn;
 
 /* Value of the Co (max_colors) entry: may not be set */
 
 /**/
-mod_export int tccolours;
+__thread mod_export int tccolours;
 
 /* SIGCHLD mask */
 
 /**/
-mod_export sigset_t sigchld_mask;
+__thread mod_export sigset_t sigchld_mask;
 
 /**/
-struct hookdef zshhooks[] = {
+__thread struct hookdef zshhooks[] = {
     HOOKDEF("exit", NULL, HOOKF_ALL),
     HOOKDEF("before_trap", NULL, HOOKF_ALL),
     HOOKDEF("after_trap", NULL, HOOKF_ALL),
@@ -267,7 +268,7 @@ loop(int toplevel, int justonce)
 }
 
 /* original argv[0]. This is already metafied */
-static char *argv0;
+static __thread char *argv0;
 
 /**/
 static void
@@ -445,7 +446,7 @@ parseopts(char *nam, char ***argvp, char *new_opts, char **cmdp,
 		if (!strcmp(*argv, "version")) {
 		    // omit patchlevel for a tagged release, which looks like:
 		    // zsh-x.y.z-0-gabcdef
-		    static const char *pfx = "zsh-" ZSH_VERSION "-0-";
+		    static __thread const char *pfx = "zsh-" ZSH_VERSION "-0-";
 		    if (strncmp(ZSH_PATCHLEVEL, pfx, strlen(pfx)))
 			printf("zsh %s [%s] (%s-%s-%s)\n",
 				ZSH_VERSION, ZSH_PATCHLEVEL, MACHTYPE, VENDOR, OSTYPE);
@@ -592,7 +593,7 @@ printhelp(void)
 mod_export void
 init_io(char *cmd)
 {
-    static char outbuf[BUFSIZ], errbuf[BUFSIZ];
+    static __thread char outbuf[BUFSIZ], errbuf[BUFSIZ];
 
 #ifdef RSH_BUG_WORKAROUND
     int i;
@@ -727,7 +728,7 @@ init_io(char *cmd)
 mod_export void
 init_shout(void)
 {
-    static char shoutbuf[BUFSIZ];
+    static __thread char shoutbuf[BUFSIZ];
 #if defined(TIOCSETD) && defined(NTTYDISC)
     int ldisc;
 #endif
@@ -760,7 +761,7 @@ init_shout(void)
 
 /* names of the termcap strings we want */
 
-static char *tccapnams[TC_COUNT] = {
+static __thread char *tccapnams[TC_COUNT] = {
     "cl", "le", "LE", "nd", "RI", "up", "UP", "do",
     "DO", "dc", "DC", "ic", "IC", "cd", "ce", "al", "dl", "ta",
     "md", "mh", "so", "us", "ZH", "me", "se", "ue", "ZR", "ch",
@@ -1568,6 +1569,13 @@ init_misc(char *cmd, char *zsh_name)
 	    close(SHIN);
 	SHIN = movefd(open("/dev/null", O_RDONLY | O_NOCTTY));
 	shinbufreset();
+	/* AOK: if this shell was started as somebody's subshell, take on that
+	 * shell's state HERE -- before execstring() parses the command.
+	 * The ordering is not stylistic. zsh parses a -c string in full before
+	 * running any of it, and alias expansion happens at parse time, so a
+	 * state applied inside the same string would be invisible to the
+	 * command it was applied for. See Src/aok_fork.c. */
+	aok_child_init();
 	execstring(cmd, 0, 1, "cmdarg");
 	stopmsg = 1;
 	zexit((exit_pending || shell_exiting) ? exit_val : lastval, ZEXIT_NORMAL);
@@ -1598,7 +1606,17 @@ source(char *s)
     struct funcstack fstack;
     enum source_return ret = SOURCE_OK;
 
-    if (!s || 
+    /* AOK: a re-launched subshell's state arrives on an inherited descriptor
+     * rather than at a path, so that nothing has to be written to the
+     * filesystem and nothing has to be cleaned up. Everything below wants a
+     * descriptor anyway -- this only skips the open. Consumed once: the flag is
+     * cleared here so a later source() cannot pick up a stale fd.
+     * See Src/aok_fork.c. */
+    if (aok_source_fd >= 0) {
+	tempfd = aok_source_fd;
+	aok_source_fd = -1;
+	prog = NULL;
+    } else if (!s ||
 	(!(prog = try_source_file((us = unmeta(s)))) &&
 	 (tempfd = movefd(open(us, O_RDONLY | O_NOCTTY))) == -1)) {
 	return SOURCE_NOT_FOUND;
@@ -1763,7 +1781,7 @@ noop_function_int(UNUSED(int nothing))
  * No other source file needs to know which modules are linked in.
  */
 /**/
-mod_export ZleEntryPoint zle_entry_ptr;
+__thread mod_export ZleEntryPoint zle_entry_ptr;
 
 /*
  * State of loading of zle.
@@ -1772,7 +1790,7 @@ mod_export ZleEntryPoint zle_entry_ptr;
  * 2 = Failed to load.
  */
 /**/
-mod_export int zle_load_state;
+__thread mod_export int zle_load_state;
 
 /**/
 mod_export char *
@@ -1864,7 +1882,7 @@ VA_DCL
 /* compctl entry point pointers.  Similar to the ZLE ones. */
 
 /**/
-mod_export CompctlReadFn compctlreadptr = fallback_compctlread;
+__thread mod_export CompctlReadFn compctlreadptr = fallback_compctlread;
 
 /**/
 mod_export int
@@ -1879,7 +1897,7 @@ fallback_compctlread(char *name, UNUSED(char **args), UNUSED(Options ops), UNUSE
  * message.
  */
 /**/
-mod_export int use_exit_printed;
+__thread mod_export int use_exit_printed;
 
 /*
  * This is real main entry point. This has to be mod_export'ed

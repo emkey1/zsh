@@ -35,18 +35,18 @@
 /* tokens */
 
 /**/
-mod_export char ztokens[] = "#$^*(())$=|{}[]`<>>?~`,-!'\"\\\\";
+__thread mod_export char ztokens[] = "#$^*(())$=|{}[]`<>>?~`,-!'\"\\\\";
 
 /* parts of the current token */
 
 /**/
-char *zshlextext;
+__thread char *zshlextext;
 /**/
-mod_export char *tokstr;
+__thread mod_export char *tokstr;
 /**/
-mod_export enum lextok tok;
+__thread mod_export enum lextok tok;
 /**/
-mod_export int tokfd;
+__thread mod_export int tokfd;
 
 /*
  * Line number at which the first character of a token was found.
@@ -57,27 +57,27 @@ mod_export int tokfd;
  */
 
 /**/
-zlong toklineno;
+__thread zlong toklineno;
 
 /* lexical analyzer error flag */
  
 /**/
-mod_export int lexstop;
+__thread mod_export int lexstop;
 
 /* if != 0, this is the first line of the command */
  
 /**/
-mod_export int isfirstln;
+__thread mod_export int isfirstln;
  
 /* if != 0, this is the first char of the command (not including white space) */
  
 /**/
-int isfirstch;
+__thread int isfirstch;
 
 /* flag that an alias should be expanded after expansion ending in space */
 
 /**/
-int inalmore;
+__thread int inalmore;
 
 /*
  * Don't do spelling correction.
@@ -87,7 +87,7 @@ int inalmore;
  */
  
 /**/
-int nocorrect;
+__thread int nocorrect;
 
 /*
  * TBD: the following exported variables are part of the non-interface
@@ -101,38 +101,38 @@ int nocorrect;
  */
 
 /**/
-mod_export int zlemetacs, zlemetall;
+__thread mod_export int zlemetacs, zlemetall;
 
 /* inwhat says what exactly we are in     *
  * (its value is one of the IN_* things). */
 
 /**/
-mod_export int inwhat;
+__thread mod_export int inwhat;
 
 /* 1 if x added to complete in a blank between words */
 
 /**/
-mod_export int addedx;
+__thread mod_export int addedx;
 
 /* wb and we hold the beginning/end position of the word we are completing. */
 
 /**/
-mod_export int wb, we;
+__thread mod_export int wb, we;
 
 /**/
-mod_export int wordbeg;
+__thread mod_export int wordbeg;
 
 /**/
-mod_export int parbegin;
+__thread mod_export int parbegin;
 
 /**/
-mod_export int parend;
+__thread mod_export int parend;
 
 
 /* 1 if aliases should not be expanded */
 
 /**/
-mod_export int noaliases;
+__thread mod_export int noaliases;
 
 /*
  * If non-zero, we are parsing a line sent to use by the editor, or some
@@ -148,27 +148,27 @@ mod_export int noaliases;
  */
 
 /**/
-mod_export int lexflags;
+__thread mod_export int lexflags;
 
 /* don't recognize comments */
 
 /**/
-mod_export int nocomments;
+__thread mod_export int nocomments;
 
 /* add raw input characters while parsing command substitution */
 
 /**/
-int lex_add_raw;
+__thread int lex_add_raw;
 
 /* variables associated with the above */
 
-static char *tokstr_raw;
-static struct lexbufstate lexbuf_raw;
+static __thread char *tokstr_raw;
+static __thread struct lexbufstate lexbuf_raw;
 
 /* text of punctuation tokens */
 
 /**/
-mod_export char *tokstrings[WHILE + 1] = {
+__thread mod_export char *tokstrings[WHILE + 1] = {
     NULL,	/* NULLTOK	  0  */
     ";",	/* SEPER	     */
     "\\n",	/* NEWLIN	     */
@@ -206,8 +206,8 @@ mod_export char *tokstrings[WHILE + 1] = {
 
 /* lexical state */
 
-static int dbparens;
-static struct lexbufstate lexbuf = { NULL, 256, 0 };
+static __thread int dbparens;
+static __thread struct lexbufstate lexbuf = { NULL, 256, 0 };
 
 /* save lexical context */
 
@@ -316,7 +316,7 @@ zshlex(void)
 mod_export void
 ctxtlex(void)
 {
-    static int oldpos;
+    static __thread int oldpos;
 
     zshlex();
     switch (tok) {
@@ -403,15 +403,15 @@ ctxtlex(void)
 #define LX2_OTHER 20
 #define LX2_META 21
 
-static unsigned char lexact1[256], lexact2[256], lextok2[256];
+static __thread unsigned char lexact1[256], lexact2[256], lextok2[256];
 
 /**/
 void
 initlextabs(void)
 {
     int t0;
-    static char *lx1 = "\\q\n;!&|(){}[]<>";
-    static char *lx2 = ";)|$[]~({}><=\\\'\"`,-!";
+    static __thread char *lx1 = "\\q\n;!&|(){}[]<>";
+    static __thread char *lx2 = ";)|$[]~({}><=\\\'\"`,-!";
 
     for (t0 = 0; t0 != 256; t0++) {
        lexact1[t0] = LX1_OTHER;

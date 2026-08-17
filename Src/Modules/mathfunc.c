@@ -111,7 +111,7 @@ enum {
 #define TFLAG(x) ((x) << 8)
 
 
-static struct mathfunc mftab[] = {
+static __thread struct mathfunc mftab[] = {
   NUMMATHFUNC("abs", math_func, 1, 1, MF_ABS |
 	      TFLAG(TF_NOCONV|TF_NOASS)),
   NUMMATHFUNC("acos", math_func, 1, 1, MF_ACOS),
@@ -457,8 +457,8 @@ math_string(UNUSED(char *name), char *arg, int id)
 #ifdef HAVE_ERAND48
     case MS_RAND48:
 	{
-	    static unsigned short seedbuf[3];
-	    static int seedbuf_init;
+	    static __thread unsigned short seedbuf[3];
+	    static __thread int seedbuf_init;
 	    unsigned short tmp_seedbuf[3], *seedbufptr;
 	    int do_init = 1;
 
@@ -535,13 +535,25 @@ math_string(UNUSED(char *name), char *arg, int id)
 }
 
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     NULL, 0,
     NULL, 0,
     mftab, sizeof(mftab)/sizeof(*mftab),
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

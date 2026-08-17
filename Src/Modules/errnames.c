@@ -6,7 +6,7 @@
 #include "system.mdh"
 
 /**/
-const char *sys_errnames[ERRCOUNT+1] = {
+__thread const char *sys_errnames[ERRCOUNT+1] = {
 	"EPERM",
 	"ENOENT",
 	"ESRCH",

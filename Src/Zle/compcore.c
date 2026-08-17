@@ -33,37 +33,37 @@
 /* Flags saying what we have to do with the result. */
 
 /**/
-int useexact, useline, uselist, forcelist, startauto;
+__thread int useexact, useline, uselist, forcelist, startauto;
 
 /**/
-mod_export int iforcemenu;
+__thread mod_export int iforcemenu;
 
 /* Non-zero if we should go back to the last prompt. */
 
 /**/
-mod_export int dolastprompt;
+__thread mod_export int dolastprompt;
 
 /* Non-zero if we should keep an old list. */
 
 /**/
-mod_export int oldlist, oldins;
+__thread mod_export int oldlist, oldins;
 
 /* Original prefix/suffix lengths. Flag saying if they changed. */
 
 /**/
-int origlpre, origlsuf, lenchanged;
+__thread int origlpre, origlsuf, lenchanged;
 
 /* This is used to decide when the cursor should be moved to the end of    *
  * the inserted word: 0 - never, 1 - only when a single match is inserted, *
  * 2 - when a full match is inserted (single or menu), 3 - always.         */
 
 /**/
-int movetoend;
+__thread int movetoend;
 
 /* The match and group number to insert when starting menucompletion.   */
 
 /**/
-mod_export int insmnum, insspace;
+__thread mod_export int insmnum, insspace;
 
 #if 0
 /* group-numbers in compstate[insert] */
@@ -73,57 +73,57 @@ int insgnum, insgroup; /* mod_export */
 /* Information about menucompletion. */
 
 /**/
-mod_export struct menuinfo minfo;
+__thread mod_export struct menuinfo minfo;
 
 /* Number of matches accepted with accept-and-menu-complete */
 
 /**/
-mod_export int menuacc;
+__thread mod_export int menuacc;
 
 /* Brace insertion stuff. */
 
 /**/
-int useqbr, brpcs, brscs;
+__thread int useqbr, brpcs, brscs;
 
 /* Flags saying in what kind of string we are. */
 
 /**/
-mod_export int ispar, linwhat;
+__thread mod_export int ispar, linwhat;
 
 /* A parameter expansion prefix (like ${). */
 
 /**/
-char *parpre;
+__thread char *parpre;
 
 /* Flags for parameter expansions for new style completion. */
 
 /**/
-int parflags;
+__thread int parflags;
 
 /* Match flags for all matches in this group. */
 
 /**/
-mod_export int mflags;
+__thread mod_export int mflags;
 
 /* Flags saying how the parameter expression we are in is quoted. */
 
 /**/
-int parq, eparq;
+__thread int parq, eparq;
 
 /* We store the following prefixes/suffixes:                               *
  * ipre,ripre  -- the ignored prefix (quoted and unquoted)                 *
  * isuf        -- the ignored suffix                                       */
 
 /**/
-mod_export char *ipre, *ripre, *isuf;
+__thread mod_export char *ipre, *ripre, *isuf;
 
 /* The list of matches.  fmatches contains the matches we first ignore *
  * because of fignore.                                                 */
 
 /**/
-mod_export LinkList matches;
+__thread mod_export LinkList matches;
 /**/
-LinkList fmatches;
+__thread LinkList fmatches;
 
 /* This holds the list of matches-groups. lastmatches holds the last list of 
  * permanently allocated matches, pmatches is the same for the list
@@ -132,123 +132,123 @@ LinkList fmatches;
  * lmatches/lastlmatches is a pointer to the last element in the lists. */
 
 /**/
-mod_export Cmgroup lastmatches, pmatches, amatches, lmatches, lastlmatches;
+__thread mod_export Cmgroup lastmatches, pmatches, amatches, lmatches, lastlmatches;
 
 /* Non-zero if we have permanently allocated matches (old and new). */
 
 /**/
-mod_export int hasoldlist, hasperm;
+__thread mod_export int hasoldlist, hasperm;
 
 /* Non-zero if we have a match representing all other matches. */
 
 /**/
-int hasallmatch;
+__thread int hasallmatch;
 
 /* Non-zero if we have newly added matches. */
 
 /**/
-mod_export int newmatches;
+__thread mod_export int newmatches;
 
 /* Number of permanently allocated matches and groups. */
 
 /**/
-mod_export int permmnum, permgnum, lastpermmnum, lastpermgnum;
+__thread mod_export int permmnum, permgnum, lastpermmnum, lastpermgnum;
 
 /* The total number of matches and the number of matches to be listed. */
 
 /**/
-mod_export int nmatches;
+__thread mod_export int nmatches;
 /**/
-mod_export int smatches;
+__thread mod_export int smatches;
 
 /* != 0 if more than one match and at least two different matches */
 
 /**/
-mod_export int diffmatches;
+__thread mod_export int diffmatches;
 
 /* The number of messages. */
 
 /**/
-mod_export int nmessages;
+__thread mod_export int nmessages;
 
 /* != 0 if only explanation strings should be printed */
 
 /**/
-mod_export int onlyexpl;
+__thread mod_export int onlyexpl;
 
 /* Information about the matches for listing. */
 
 /**/
-mod_export struct cldata listdat;
+__thread mod_export struct cldata listdat;
 
 /* This flag is non-zero if we are completing a pattern (with globcomplete) */
 
 /**/
-mod_export int ispattern, haspattern;
+__thread mod_export int ispattern, haspattern;
 
 /* Non-zero if at least one match was added without/with -U. */
 
 /**/
-mod_export int hasmatched, hasunmatched;
+__thread mod_export int hasmatched, hasunmatched;
 
 /* The current group of matches. */
 
 /**/
-Cmgroup mgroup;
+__thread Cmgroup mgroup;
 
 /* Match counter: all matches. */
 
 /**/
-mod_export int mnum;
+__thread mod_export int mnum;
 
 /* The match counter when unambig_data() was called. */
 
 /**/
-mod_export int unambig_mnum;
+__thread mod_export int unambig_mnum;
 
 /* Length of longest/shortest match. */
 
 /**/
-int maxmlen, minmlen;
+__thread int maxmlen, minmlen;
 
 /* This holds the explanation strings we have to print in this group and *
  * a pointer to the current cexpl structure. */
 
 /**/
-LinkList expls;
+__thread LinkList expls;
 
 /**/
-mod_export Cexpl curexpl;
+__thread mod_export Cexpl curexpl;
 
 /* A stack of completion matchers to be used. */
 
 /**/
-mod_export Cmlist mstack;
+__thread mod_export Cmlist mstack;
 
 /* The completion matchers used when building new stuff for the line. */
 
 /**/
-mod_export Cmlist bmatchers;
+__thread mod_export Cmlist bmatchers;
 
 /* A list with references to all matchers we used. */
 
 /**/
-mod_export LinkList matchers;
+__thread mod_export LinkList matchers;
 
 /* A heap of free Cline structures. */
 
 /**/
-mod_export Cline freecl;
+__thread mod_export Cline freecl;
 
 /* Ambiguous information. */
 
 /**/
-mod_export Aminfo ainfo, fainfo;
+__thread mod_export Aminfo ainfo, fainfo;
 
 /* The memory heap to use for new style completion generation. */
 
 /**/
-mod_export Heap compheap;
+__thread mod_export Heap compheap;
 
 /* A list of some data.
  *
@@ -256,7 +256,7 @@ mod_export Heap compheap;
  * conceptually we don't know anything about compctls here... */
 
 /**/
-mod_export LinkList allccs;
+__thread mod_export LinkList allccs;
 
 /* This says what of the state the line is in when completion is started *
  * came from a previous completion. If the FC_LINE bit is set, the       *
@@ -268,12 +268,12 @@ mod_export LinkList allccs;
  * end of the word before generating the completions.                    */
 
 /**/
-int fromcomp;
+__thread int fromcomp;
 
 /* This holds the end-position of the last string inserted into the line. */
 
 /**/
-mod_export int lastend;
+__thread mod_export int lastend;
 
 #define inststr(X) inststrlen((X),1,-1)
 
@@ -453,7 +453,7 @@ do_completion(UNUSED(Hookdef dummy), Compldat dat)
 
 /* Before and after hooks called by zle. */
 
-static int oldmenucmp;
+static __thread int oldmenucmp;
 
 /**/
 int
@@ -536,7 +536,7 @@ after_complete(UNUSED(Hookdef dummy), int *dat)
 
 /* This calls the given completion widget function. */
 
-static int parwb, parwe, paroffs;
+static __thread int parwb, parwe, paroffs;
 
 /**/
 static void
@@ -3165,7 +3165,7 @@ addexpl(int always)
 
 /* The comparison function for matches (used for sorting). */
 
-static int matchorder;
+static __thread int matchorder;
 
 /**/
 static int
@@ -3427,7 +3427,7 @@ permmatches(int last)
     Cmatch *p, *q;
     Cexpl *ep, *eq, e, o;
     LinkList mlist;
-    static int fi = 0;
+    static __thread int fi = 0;
     int nn, nl, ll, gn = 1, mn = 1, rn, ofi = fi;
 
     if (pmatches && !newmatches) {

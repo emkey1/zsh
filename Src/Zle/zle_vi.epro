@@ -2,14 +2,14 @@
 #ifndef have_Src_Zle_zle_vi_globals
 #define have_Src_Zle_zle_vi_globals
 
-extern int virangeflag;
-extern int wordflag;
-extern int vilinerange;
-extern struct vichange lastvichg;
-extern struct vichange curvichg;
-extern int vichgflag;
-extern int viinrepeat;
-extern int viinsbegin;
+__thread extern int virangeflag;
+__thread extern int wordflag;
+__thread extern int vilinerange;
+__thread extern struct vichange lastvichg;
+__thread extern struct vichange curvichg;
+__thread extern int vichgflag;
+__thread extern int viinrepeat;
+__thread extern int viinsbegin;
 extern void startvichange(int im);
 extern ZLE_INT_T vigetkey(void);
 extern int viaddnext(UNUSED(char**args));

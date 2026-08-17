@@ -47,8 +47,8 @@
 #endif
 
 /* buffer to pre-load integers for SRANDOM to lessen the context switches */
-static uint32_t rand_buff[8];
-static int buf_cnt = -1;
+static __thread uint32_t rand_buff[8];
+static __thread int buf_cnt = -1;
 
 #ifdef USE_URANDOM
 /* File descriptor for /dev/urandom */
@@ -221,26 +221,55 @@ math_zrand_float(UNUSED(char *name), UNUSED(int argc), UNUSED(mnumber *argv),
     return ret;
 }
 
-static const struct gsu_integer srandom_gsu =
+static __thread const struct gsu_integer srandom_gsu =
 { get_srandom, nullintsetfn, stdunsetfn };
 
-static struct paramdef patab[] = {
+/* AOK: patab's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef struct paramdef aok_tt_patab[1];
+static __thread aok_tt_patab aok_tv_patab;
+static __thread char aok_ti_patab;
+static aok_tt_patab *aok_tf_patab(void) {
+    if (!aok_ti_patab) {
+        struct paramdef aok_tmp[] = {
     {"SRANDOM", PM_INTEGER | PM_READONLY_SPECIAL | PM_HIDEVAL, NULL,
 	    &srandom_gsu, NULL, NULL, NULL},
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 1,
+                       "patab: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_patab, aok_tmp, sizeof(aok_tmp));
+        aok_ti_patab = 1;
+    }
+    return &aok_tv_patab;
+}
+#define patab (*aok_tf_patab())
 
-static struct mathfunc mftab[] = {
+
+static __thread struct mathfunc mftab[] = {
     NUMMATHFUNC("zrand_float", math_zrand_float, 0, 0, 0),
     NUMMATHFUNC("zrand_int", math_zrand_int, 0, 3, 0),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     NULL, 0,
     NULL, 0,
     mftab, sizeof(mftab)/sizeof(*mftab),
     patab, sizeof(patab)/sizeof(*patab),
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

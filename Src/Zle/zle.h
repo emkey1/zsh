@@ -230,6 +230,49 @@ struct thingy {
     Thingy samew;	/* `next' thingy (circularly) naming the same widget */
 };
 
+/*
+ * AOK: thingies[] is per-shell, not per-process.
+ *
+ * A native zsh is a function call on a guest task's thread, so two live shells
+ * are two threads of one process sharing one address space.  thingies[] is
+ * mutable in three ways at once -- each entry carries a reference count, the
+ * HashNode `next' that chains it into *that shell's* thingytab, and a widget
+ * pointer that `zle -N accept-line ...' or a bindkey of a built-in name
+ * rewrites -- so one shared copy meant one shell's rebinding landed in
+ * another's key table, and the second shell's init_thingies() re-chained the
+ * nodes out from under the first's hash table.  Interactive shells are the
+ * main use of a shell, so that was not survivable.
+ *
+ * It cannot simply be __thread: thingies[]'s initialiser takes the addresses
+ * of widgets[] entries and widgets[]'s initialiser takes the addresses of
+ * thingies[] entries, and the address of a thread-local is not a constant
+ * expression.  Both are therefore deferred to first use -- the pattern
+ * tools/zsh-tls-fix-tables.py generates for exactly this problem elsewhere in
+ * the tree.  Src/Zle/zle_bindings.c holds the two initialisers and the note on
+ * how the cycle between them is broken.
+ *
+ * The accessor has to be visible in EVERY file that names thingies[]: a file
+ * left reaching a shared array would compile clean, link clean, and read the
+ * wrong memory.  So it lives here, in the header zle.mdh includes ahead of
+ * every .epro and every ZLE source, and not in zle_bindings.c.
+ * tools/check-bash-tls.py is the gate on that.
+ */
+enum {
+    aok_n_thingies = 1		/* the { NULL, NULL, ... } terminator */
+#define T(name, th_flags, w_idget, t_next) + 1
+#include "thingies.list"
+#undef T
+};
+typedef struct thingy aok_tt_thingies[aok_n_thingies];
+/*
+ * Pointer to ARRAY, not to first element.  `#define thingies aok_tf_thingies()'
+ * would silently turn a sizeof(thingies) into sizeof(pointer); dereferencing a
+ * pointer-to-array gives back an lvalue of array type, so sizeof, indexing and
+ * decay all behave exactly as they did when this was a plain array.
+ */
+extern aok_tt_thingies *aok_tf_thingies(void);
+#define thingies (*aok_tf_thingies())
+
 /* DISABLED is (1<<0) */
 #define TH_IMMORTAL	(1<<1)    /* can't refer to a different widget */
 

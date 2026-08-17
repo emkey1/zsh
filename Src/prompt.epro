@@ -2,12 +2,12 @@
 #ifndef have_Src_prompt_globals
 #define have_Src_prompt_globals
 
-extern mod_import_variable zattr txtcurrentattrs;
-extern mod_import_variable zattr txtpendingattrs;
-extern mod_import_variable zattr txtunknownattrs;
-extern mod_import_variable zattr memo_term_color;
-extern unsigned char*cmdstack;
-extern int cmdsp;
+__thread extern mod_import_variable zattr txtcurrentattrs;
+__thread extern mod_import_variable zattr txtpendingattrs;
+__thread extern mod_import_variable zattr txtunknownattrs;
+__thread extern mod_import_variable zattr memo_term_color;
+__thread extern unsigned char*cmdstack;
+__thread extern int cmdsp;
 extern mod_import_function char*promptexpand(char*s,int ns,const char*marker,char*rs,char*Rs);
 extern mod_import_function char*zattrescape(zattr atr,int*len);
 extern mod_import_function char*parsehighlight(char*arg,char endchar,zattr*atr,zattr*mask);

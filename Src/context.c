@@ -43,7 +43,7 @@ struct context_stack {
     struct parse_stack parse_stack;
 };
 
-static struct context_stack *cstack;
+static __thread struct context_stack *cstack;
 
 /* save some or all of current context */
 

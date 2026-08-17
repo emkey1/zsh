@@ -1,5 +1,5 @@
 /* Generated automatically */
-static Cmlist cmatcher;
+static __thread Cmlist cmatcher;
 static void createcompctltable(void);
 static void freecompctlp(HashNode hn);
 static void freecompctl(Compctl cc);

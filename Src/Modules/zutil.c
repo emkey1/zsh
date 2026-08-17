@@ -103,7 +103,7 @@ struct stypat {
 
 /* Hash table of styles and associated functions. */
 
-static HashTable zstyletab;
+static __thread HashTable zstyletab;
 
 /* Memory stuff. */
 
@@ -169,7 +169,7 @@ freestypat(Stypat p, Style s, Stypat prev)
 
 /* Pattern to match context when printing nodes */
 
-static Patprog zstyle_contprog;
+static __thread Patprog zstyle_contprog;
 
 /*
  * Print a node.  Print flags as shown.
@@ -216,8 +216,8 @@ printstylenode(HashNode hn, int printflags)
  * the link list (heap memory).  Value to be added as
  * shown in enum
  */
-static LinkList zstyle_list;
-static char *zstyle_patname;
+static __thread LinkList zstyle_list;
+static __thread char *zstyle_patname;
 
 enum {
     ZSPAT_NAME,		/* Add style names for matched pattern to list */
@@ -1193,8 +1193,8 @@ typedef struct {
     LinkList out;
 } RParseResult;
 
-static char **rparseargs;
-static LinkList rparsestates;
+static __thread char **rparseargs;
+static __thread LinkList rparsestates;
 
 static int rparsealt(RParseResult *result, jmp_buf *perr);
 
@@ -1636,8 +1636,8 @@ struct zoptval {
     char *str;
 };
 
-static Zoptdesc opt_descs;
-static Zoptarr opt_arrs;
+static __thread Zoptdesc opt_descs;
+static __thread Zoptarr opt_arrs;
 
 static Zoptdesc
 get_opt_desc(char *name)
@@ -2147,20 +2147,32 @@ bin_zparseopts(char *nam, char **args, Options ops, UNUSED(int func))
     return 0;
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("zformat", 0, bin_zformat, 2, -1, 0, "afFqQ", NULL),
     BUILTIN("zparseopts", 0, bin_zparseopts, 0, -1, 0, "a:A:DEFGKMn:v:", NULL),
     BUILTIN("zregexparse", 0, bin_zregexparse, 3, -1, 0, "c", NULL),
     BUILTIN("zstyle", 0, bin_zstyle, 0, -1, 0, NULL, NULL),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

@@ -20,7 +20,8 @@ static void addfd(int forked,int*save,struct multio**mfds,int fd1,int fd2,int rf
 static void addvars(Estate state,Wordcode pc,int addflags);
 static HashNode resolvebuiltin(const char*cmdarg,HashNode hn);
 static void execcmd_analyse(Estate state,Execcmd_params eparams);
-static int execcmd_fork(Estate state,int how,int type,Wordcode varspc,LinkList*filelistp,char*text,int oautocont,int close_if_forked);
+char *aok_quote_words(LinkList args);
+static int execcmd_fork(Estate state,int how,int type,Wordcode varspc,LinkList*filelistp,char*text,char*aoktext,int input,int output,int oautocont,int close_if_forked);
 static void execcmd_exec(Estate state,Execcmd_params eparams,int input,int output,int how,int last1,int close_if_forked);
 static void save_params(Estate state,Wordcode pc,LinkList*restore_p,LinkList*remove_p);
 static void restore_params(LinkList restorelist,LinkList removelist);

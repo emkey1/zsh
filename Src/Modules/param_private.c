@@ -74,7 +74,7 @@ static const struct gsu_hash hash_private_gsu =
  *
  */
 
-static int makeprivate_error = 0;
+static __thread int makeprivate_error = 0;
 
 static void
 makeprivate(HashNode hn, UNUSED(int flags))
@@ -210,7 +210,7 @@ is_private(Param pm)
     return 1;
 }
 
-static int fakelevel;
+static __thread int fakelevel;
 
 /**/
 static int
@@ -407,7 +407,7 @@ ppf_unsetfn(Param pm, int explicit)
 static char **
 ppa_getfn(Param pm)
 {
-    static char *nullarray = NULL;
+    static __thread char *nullarray = NULL;
     struct gsu_closure *c = (struct gsu_closure *)(pm->gsu.a);
     GsuArray gsu = (GsuArray)(c->g);
     if (locallevel >= pm->level)
@@ -444,7 +444,7 @@ ppa_unsetfn(Param pm, int explicit)
 	zfree(c, sizeof(struct gsu_closure));
 }
 
-static HashTable emptytable;
+static __thread HashTable emptytable;
 
 /**/
 static HashTable
@@ -538,12 +538,12 @@ scopeprivate(HashNode hn, int onoff)
     }
 }
 
-static struct funcwrap wrapper[] = {
+static __thread struct funcwrap wrapper[] = {
     WRAPDEF(wrap_private)
 };
 
 /**/
-static int private_wraplevel = 0;
+static __thread int private_wraplevel = 0;
 
 /**/
 static int
@@ -561,7 +561,7 @@ wrap_private(Eprog prog, FuncWrap w, char *name)
     return 1;
 }
 
-static GetNodeFunc getparamnode;
+static __thread GetNodeFunc getparamnode;
 
 /**/
 static HashNode
@@ -647,23 +647,35 @@ printprivatenode(HashNode hn, int printflags)
  * Standard module configuration/linkage
  */
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     /* Copied from BUILTIN("local"), "P" added */
     BUILTIN("private", BINF_PLUSOPTS | BINF_MAGICEQUALS | BINF_PSPECIAL | BINF_ASSIGN, (HandlerFunc)bin_private, 0, -1, 0, "AE:%F:%HL:%PR:%TUZ:%ahi:%lnmrtux", "P")
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
 
-static struct builtin save_local;
-static GetNodeFunc save_getnode2;
-static ScanFunc save_printnode;
-static struct reswd reswd_private = {{NULL, "private", 0}, TYPESET};
+
+static __thread struct builtin save_local;
+static __thread GetNodeFunc save_getnode2;
+static __thread ScanFunc save_printnode;
+static __thread struct reswd reswd_private = {{NULL, "private", 0}, TYPESET};
 
 /**/
 int

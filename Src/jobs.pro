@@ -1,6 +1,6 @@
 /* Generated automatically */
 #ifdef HAVE_GETRUSAGE
-static struct rusage child_usage;
+static __thread struct rusage child_usage;
 #else
 static struct tms shtms;
 #endif

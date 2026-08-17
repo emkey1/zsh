@@ -55,60 +55,60 @@
    when we started without being process group leader */
 
 /**/
-pid_t origpgrp;
+__thread pid_t origpgrp;
 
 /* the process group of the shell */
 
 /**/
-mod_export pid_t mypgrp;
+__thread mod_export pid_t mypgrp;
 
 /* the last process group to attach to the terminal */
 
 /**/
-pid_t last_attached_pgrp;
+__thread pid_t last_attached_pgrp;
  
 /* the job we are working on, or -1 if none */
  
 /**/
-mod_export int thisjob;
+__thread mod_export int thisjob;
 
 /* the current job (%+) */
  
 /**/
-mod_export int curjob;
+__thread mod_export int curjob;
  
 /* the previous job (%-) */
  
 /**/
-mod_export int prevjob;
+__thread mod_export int prevjob;
  
 /* the job table */
  
 /**/
-mod_export struct job *jobtab;
+__thread mod_export struct job *jobtab;
 
 /* Size of the job table. */
 
 /**/
-mod_export int jobtabsize;
+__thread mod_export int jobtabsize;
 
 /* The highest numbered job in the jobtable */
 
 /**/
-mod_export int maxjob;
+__thread mod_export int maxjob;
 
 /* If we have entered a subshell, the original shell's job table. */
-static struct job *oldjobtab;
+static __thread struct job *oldjobtab;
 
 /* The size of that. */
-static int oldmaxjob;
+static __thread int oldmaxjob;
 
 /* shell timings */
  
 /**/
 #ifdef HAVE_GETRUSAGE
 /**/
-static struct rusage child_usage;
+static __thread struct rusage child_usage;
 /**/
 #else
 /**/
@@ -119,16 +119,16 @@ static struct tms shtms;
 /* 1 if ttyctl -f has been executed */
  
 /**/
-mod_export int ttyfrozen;
+__thread mod_export int ttyfrozen;
 
 /* Previous values of errflag and breaks if the signal handler had to
  * change them. And a flag saying if it did that. */
 
 /**/
-int prev_errflag, prev_breaks, errbrk_saved;
+__thread int prev_errflag, prev_breaks, errbrk_saved;
 
 /**/
-int numpipestats, pipestats[MAX_PIPESTATS];
+__thread int numpipestats, pipestats[MAX_PIPESTATS];
 
 /* Diff two timevals for elapsed-time computations */
 
@@ -729,7 +729,7 @@ setprevjob(void)
 long
 get_clktck(void)
 {
-    static long clktck;
+    static __thread long clktck;
 
 #ifdef _SC_CLK_TCK
     if (!clktck)
@@ -1115,7 +1115,7 @@ should_report_time(Job j)
 mod_export char *
 sigmsg(int sig)
 {
-    static char *unknown = "unknown signal";
+    static __thread char *unknown = "unknown signal";
 #if defined(SIGRTMIN) && defined(SIGRTMAX)
     static char rtmsg[] = "real-time event XXX";
     if (sig >= SIGRTMIN && sig <= SIGRTMAX) {
@@ -2159,8 +2159,8 @@ getjob(const char *s, const char *prog)
  * hackzero is the start of the safely writable space, and hackspace is   *
  * its length, excluding a final NUL terminator that will always be left. */
 
-static char *hackzero;
-static int hackspace;
+static __thread char *hackzero;
+static __thread int hackspace;
 #endif
 
 
@@ -2306,9 +2306,9 @@ struct bgstatus {
 };
 typedef struct bgstatus *Bgstatus;
 /* The list of those entries */
-static LinkList bgstatus_list;
+static __thread LinkList bgstatus_list;
 /* Count of entries.  Reaches value of _SC_CHILD_MAX and stops. */
-static long bgstatus_count;
+static __thread long bgstatus_count;
 
 /*
  * Remove and free a bgstatus entry.
@@ -2331,7 +2331,7 @@ static void rembgstatus(LinkNode node)
 void
 addbgstatus(pid_t pid, int status)
 {
-    static long child_max;
+    static __thread long child_max;
     Bgstatus bgstatus_entry;
 #ifdef DEBUG
     LinkNode node;

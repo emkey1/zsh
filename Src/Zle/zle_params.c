@@ -129,16 +129,29 @@ static const struct gsu_hash registers_gsu =
 { hashgetfn, set_registers, unset_registers };
 
 /* implementation is in zle_refresh.c */
-static const struct gsu_array region_highlight_gsu =
+static __thread const struct gsu_array region_highlight_gsu =
 { get_region_highlight, set_region_highlight, unset_region_highlight };
 
 #define GSU(X) ( (GsuScalar)(void*)(&(X)) )
-static struct zleparam {
+/* AOK: zleparams's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef struct zleparam {
     char *name;
     int type;
     GsuScalar gsu;
     void *data;
-} zleparams[] = {
+} aok_tt_zleparams[40];
+static __thread aok_tt_zleparams aok_tv_zleparams;
+static __thread char aok_ti_zleparams;
+static aok_tt_zleparams *aok_tf_zleparams(void) {
+    if (!aok_ti_zleparams) {
+        struct zleparam {
+    char *name;
+    int type;
+    GsuScalar gsu;
+    void *data;
+} aok_tmp[] = {
     { "BUFFER",  PM_SCALAR,  GSU(buffer_gsu), NULL },
     { "BUFFERLINES", PM_INTEGER | PM_READONLY, GSU(bufferlines_gsu),
         NULL },
@@ -186,6 +199,15 @@ static struct zleparam {
     { "ZLE_STATE", PM_SCALAR | PM_READONLY, GSU(zle_state_gsu), NULL },
     { NULL, 0, NULL, NULL }
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 40,
+                       "zleparams: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_zleparams, aok_tmp, sizeof(aok_tmp));
+        aok_ti_zleparams = 1;
+    }
+    return &aok_tv_zleparams;
+}
+#define zleparams (*aok_tf_zleparams())
+
 
 /* ro means parameters are readonly, used from completion */
 

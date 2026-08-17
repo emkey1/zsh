@@ -38,20 +38,20 @@
  */
 
 /**/
-int text_expand_tabs;
+__thread int text_expand_tabs;
 
 /*
  * Binary operators in conditions.
  * There order is tied to the order of the definitions COND_STREQ
  * et seq. in zsh.h.
  */
-static const char *cond_binary_ops[] = {
+static __thread const char *cond_binary_ops[] = {
     "=", "==", "!=", "<", ">", "-nt", "-ot", "-ef", "-eq",
     "-ne", "-lt", "-gt", "-le", "-ge", "=~", NULL
 };
 
-static char *tptr, *tbuf, *tlim, *tpending;
-static int tsiz, tindent, tnewlins, tjob;
+static __thread char *tptr, *tbuf, *tlim, *tpending;
+static __thread int tsiz, tindent, tnewlins, tjob;
 
 /**/
 int
@@ -314,7 +314,7 @@ getpermtext(Eprog prog, Wordcode c, int start_indent)
 char *
 getjobtext(Eprog prog, Wordcode c)
 {
-    static char jbuf[JOBTEXTSIZE];
+    static __thread char jbuf[JOBTEXTSIZE];
 
     struct estate s;
 
@@ -390,7 +390,7 @@ struct tstack {
     } u;
 };
 
-static Tstack tstack, tfree;
+static __thread Tstack tstack, tfree;
 
 static Tstack
 tpush(wordcode code, int pop)
@@ -1019,7 +1019,7 @@ void
 getredirs(LinkList redirs)
 {
     LinkNode n;
-    static char *fstr[] =
+    static __thread char *fstr[] =
     {
 	">", ">|", ">>", ">>|", "&>", "&>|", "&>>", "&>>|", "<>", "<",
 	"<<", "<<-", "<<<", "<&", ">&", NULL /* >&- */, "<", ">"

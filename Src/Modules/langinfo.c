@@ -37,7 +37,7 @@
 /**/
 #ifdef HAVE_NL_LANGINFO
 
-static char *nl_names[] = {
+static __thread char *nl_names[] = {
 #ifdef CODESET
     "CODESET",
 #endif /* CODESET */
@@ -206,7 +206,7 @@ static char *nl_names[] = {
     NULL
 };
 
-static nl_item nl_vals[] = {
+static __thread nl_item nl_vals[] = {
 #ifdef CODESET
     CODESET,
 #endif /* CODESET */
@@ -443,14 +443,19 @@ scanlanginfo(UNUSED(HashTable ht), ScanFunc func, int flags)
     }
 }
 
-static struct paramdef partab[] = {
+static __thread struct paramdef partab[] = {
     SPECIALPMDEF("langinfo", 0, NULL, getlanginfo, scanlanginfo)
 };
 
 /**/
 #endif /* HAVE_NL_LANGINFO */
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     NULL, 0,
     NULL, 0,
     NULL, 0,
@@ -461,6 +466,13 @@ static struct features module_features = {
 #endif
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

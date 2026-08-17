@@ -33,17 +33,17 @@
 /* name of script being sourced */
 
 /**/
-mod_export char *scriptname;     /* is sometimes a function name */
+__thread mod_export char *scriptname;     /* is sometimes a function name */
 
 /* filename of script or other file containing code source e.g. autoload */
 
 /**/
-mod_export char *scriptfilename;
+__thread mod_export char *scriptfilename;
 
 /* != 0 if we are in a new style completion function */
 
 /**/
-mod_export int incompfunc;
+__thread mod_export int incompfunc;
 
 #ifdef MULTIBYTE_SUPPORT
 struct widechar_array {
@@ -56,12 +56,12 @@ typedef struct widechar_array *Widechar_array;
  * The wordchars variable turned into a wide character array.
  * This is much more convenient for testing.
  */
-static struct widechar_array wordchars_wide;
+static __thread struct widechar_array wordchars_wide;
 
 /*
  * The same for the separators (IFS) array.
  */
-static struct widechar_array ifs_wide;
+static __thread struct widechar_array ifs_wide;
 
 /* Function to set one of the above from the multibyte array */
 
@@ -457,7 +457,7 @@ putshout(int c)
 mod_export char *
 nicechar_sel(int c, int quotable)
 {
-    static char buf[10];
+    static __thread char buf[10];
     char *s = buf;
     c &= 0xff;
     if (ZISPRINT(c))
@@ -491,6 +491,22 @@ nicechar_sel(int c, int quotable)
 	    *s++ = '\\';
 	    *s++ = 'C';
 	    *s++ = '-';
+	    /* AOK: 0x1c is Ctrl-\, and the character this branch is about to
+	     * write for it is a bare backslash. The caller is building a
+	     * $'...' string, so that backslash escapes whatever comes next --
+	     * the following character of the value, or, when the byte is the
+	     * last one, the closing quote. `v=$'\x9cX'` printed by typeset -p
+	     * came back as one byte 0x98 with the X gone, and `v=$'\x9c'`
+	     * printed as an unterminated $'\M-\C-\' that made the whole line
+	     * unparseable. iSH-AOK notices where upstream does not because
+	     * aok_fork.c re-reads typeset -p's output in another shell: one
+	     * such line aborts the sourced state and the subshell starts with
+	     * none of its parent. 0x9c and 0x1c are not exotic -- 0x9c is the
+	     * middle byte of 本 (E6 9C AC) whenever the locale is not one this
+	     * shell can decode, e.g. under LC_ALL=C or `unsetopt multibyte`.
+	     * `\C-\\` reads back as 0x1c, so doubling it is the whole fix. */
+	    if (c + 0x40 == '\\')
+		*s++ = '\\';
 	} else
 	    *s++ = '^';
 	c += 0x40;
@@ -536,7 +552,7 @@ is_nicechar(int c)
 
 /**/
 #ifdef MULTIBYTE_SUPPORT
-static mbstate_t mb_shiftstate;
+static __thread mbstate_t mb_shiftstate;
 
 /*
  * Initialise multibyte state: called before a sequence of
@@ -588,8 +604,8 @@ mb_charinit(void)
 mod_export char *
 wcs_nicechar_sel(wchar_t c, size_t *widthp, char **swidep, int quotable)
 {
-    static char *buf;
-    static int bufalloc = 0, newalloc;
+    static __thread char *buf;
+    static __thread int bufalloc = 0, newalloc;
     char *s, *mbptr;
     int ret = 0;
     VARARR(char, mbstr, MB_CUR_MAX);
@@ -629,6 +645,13 @@ wcs_nicechar_sel(wchar_t c, size_t *widthp, char **swidep, int quotable)
 		*s++ = '\\';
 		*s++ = 'C';
 		*s++ = '-';
+		/* AOK: the wide-character twin of the doubling in
+		 * nicechar_sel above, broken for the same reason -- U+001C is
+		 * Ctrl-\, so the bare backslash this is about to write
+		 * escapes the next character of the $'...' string, or its
+		 * closing quote. */
+		if (c + 0x40 == L'\\')
+		    *s++ = '\\';
 	    } else
 		*s++ = '^';
 	    c += 0x40;
@@ -827,7 +850,7 @@ ispwd(char *s)
     return 0;
 }
 
-static char xbuf[PATH_MAX*2+1];
+static __thread char xbuf[PATH_MAX*2+1];
 
 /**/
 static char **
@@ -1063,9 +1086,9 @@ substnamedir(char *s)
  * or other source.                                      */
 
 /**/
-uid_t cached_uid;
+__thread uid_t cached_uid;
 /**/
-char *cached_username;
+__thread char *cached_username;
 
 /**/
 mod_export char *
@@ -1092,9 +1115,9 @@ get_username(void)
 
 /* static variables needed by finddir(). */
 
-static char *finddir_full;
-static Nameddir finddir_last;
-static int finddir_best;
+static __thread char *finddir_full;
+static __thread Nameddir finddir_last;
+static __thread int finddir_best;
 
 /* ScanFunc used by finddir(). */
 
@@ -1123,8 +1146,8 @@ finddir_scan(HashNode hn, UNUSED(int flags))
 Nameddir
 finddir(char *s)
 {
-    static struct nameddir homenode = { {NULL, "", 0}, NULL, 0 };
-    static int ffsz;
+    static __thread struct nameddir homenode = { {NULL, "", 0}, NULL, 0 };
+    static __thread int ffsz;
     char **ares;
     int len;
 
@@ -1308,7 +1331,7 @@ dircmp(char *s, char *t)
  * The data is a Prepromptfn.
  */
 
-static LinkList prepromptfns;
+static __thread LinkList prepromptfns;
 
 /* Add a function to the list of pre-prompt functions. */
 
@@ -1360,7 +1383,7 @@ delprepromptfn(voidvoidfnptr_t func)
  */
 
 /**/
-mod_export LinkList timedfns;
+__thread mod_export LinkList timedfns;
 
 /* Add a function to the list of timed functions. */
 
@@ -1445,7 +1468,7 @@ deltimedfn(voidvoidfnptr_t func)
 /* the last time we checked mail */
 
 /**/
-time_t lastmailcheck;
+__thread time_t lastmailcheck;
 
 /*
  * Call a function given by "name" with optional arguments
@@ -1527,7 +1550,7 @@ callhookfunc(char *name, LinkList lnklst, int arrayp, int *retval)
 void
 preprompt(void)
 {
-    static time_t lastperiodic;
+    static __thread time_t lastperiodic;
     time_t currentmailcheck;
     LinkNode ln;
     zlong period = getiparam("PERIOD");
@@ -1711,7 +1734,7 @@ checkmailpath(char **s)
 /* This prints the XTRACE prompt. */
 
 /**/
-FILE *xtrerr = 0;
+__thread FILE *xtrerr = 0;
 
 /**/
 void
@@ -1813,18 +1836,18 @@ fdsettyinfo(int SHTTY, struct ttyinfo *ti)
 /* the default tty state */
 
 /**/
-mod_export struct ttyinfo shttyinfo;
+__thread mod_export struct ttyinfo shttyinfo;
 
 /* != 0 if we need to call resetvideo() */
 
 /**/
-mod_export int resetneeded;
+__thread mod_export int resetneeded;
 
 #ifdef TIOCGWINSZ
 /* window size changed */
 
 /**/
-mod_export int winchanged;
+__thread mod_export int winchanged;
 #endif
 
 static int
@@ -1888,7 +1911,7 @@ adjustcolumns(int signalled)
 void
 adjustwinsize(int from)
 {
-    static int getwinsz = 1;
+    static __thread int getwinsz = 1;
 #ifdef TIOCGWINSZ
     int ttyrows = shttyinfo.winsize.ws_row;
     int ttycols = shttyinfo.winsize.ws_col;
@@ -3102,9 +3125,9 @@ getquery(char *valid_chars, int purge)
     return c;
 }
 
-static int d;
-static char *guess, *best;
-static Patprog spckpat, spnamepat;
+static __thread int d;
+static __thread char *guess, *best;
+static __thread Patprog spckpat, spnamepat;
 
 /**/
 static void
@@ -4147,8 +4170,8 @@ equalsplit(char *s, char **t)
 /* the ztypes table */
 
 /**/
-mod_export short int typtab[256];
-static int typtab_flags = 0;
+__thread mod_export short int typtab[256];
+static __thread int typtab_flags = 0;
 
 /* initialize the ztypes table */
 
@@ -4564,7 +4587,7 @@ static char *
 spname(char *oldname)
 {
     char *p, spnameguess[PATH_MAX + 1], spnamebest[PATH_MAX + 1];
-    static char newname[PATH_MAX + 1];
+    static __thread char newname[PATH_MAX + 1];
     char *new = newname, *old = oldname;
     int bestdist = 0, thisdist, thresh, maxthresh = 0;
 
@@ -4776,7 +4799,7 @@ setcbreak(void)
 mod_export void
 attachtty(pid_t pgrp)
 {
-    static int ep = 0;
+    static __thread int ep = 0;
 
     if (jobbing && interact) {
 #ifdef HAVE_TCSETPGRP
@@ -4859,7 +4882,7 @@ metafy(char *buf, int len, int heap)
 {
     int meta = 0;
     char *t, *p, *e;
-    static char mbuf[PATH_MAX*2+1];
+    static __thread char mbuf[PATH_MAX*2+1];
 
     if (len == -1) {
 	for (e = buf, len = 0; *e; len++)
@@ -4995,8 +5018,8 @@ metalen(const char *s, int len)
 mod_export char *
 unmeta(const char *file_name)
 {
-    static char *fn;
-    static int sz;
+    static __thread char *fn;
+    static __thread int sz;
     char *p;
     const char *t;
     int newsz, meta;
@@ -5220,8 +5243,8 @@ zreaddir(DIR *dir, int ignoredots)
 {
     struct dirent *de;
 #if defined(HAVE_ICONV) && defined(__APPLE__)
-    static iconv_t conv_ds = (iconv_t)0;
-    static char *conv_name = 0;
+    static __thread iconv_t conv_ds = (iconv_t)0;
+    static __thread char *conv_name = 0;
     char *conv_name_ptr, *orig_name_ptr;
     size_t conv_name_len, orig_name_len;
 #endif

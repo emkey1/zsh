@@ -51,12 +51,12 @@
  */
  
 /**/
-mod_export int locallevel;
+__thread mod_export int locallevel;
 
 /* Variables holding values of special parameters */
  
 /**/
-char **pparams,		/* $argv        */
+__thread char **pparams,		/* $argv        */
      **cdpath,		/* $cdpath      */
      **fpath,		/* $fpath       */
      **mailpath,	/* $mailpath    */
@@ -65,11 +65,11 @@ char **pparams,		/* $argv        */
      **zsh_eval_context; /* $zsh_eval_context */
 /**/
 mod_export
-char **path,		/* $path        */
+__thread char **path,		/* $path        */
      **fignore;		/* $fignore     */
  
 /**/
-char *argzero,		/* $0           */
+__thread char *argzero,		/* $0           */
      *ifs,		/* $IFS         */
      *nullcmd,		/* $NULLCMD     */
      *oldpwd,		/* $OLDPWD      */
@@ -88,17 +88,17 @@ char *argzero,		/* $0           */
      *zsh_terminfodirs; /* $TERMINFO_DIRS */
 /**/
 mod_export
-char *home,		/* $HOME        */
+__thread char *home,		/* $HOME        */
      *postedit,		/* $POSTEDIT    */
      *term,		/* $TERM        */
      *ttystrname,	/* $TTY         */
      *pwd;		/* $PWD         */
 
 /**/
-mod_export volatile zlong
+__thread mod_export volatile zlong
      lastval;		/* $?           */
 /**/
-mod_export zlong
+__thread mod_export zlong
      mypid,		/* $$           */
      lastpid,		/* $!           */
      zterm_columns,	/* $COLUMNS     */
@@ -110,12 +110,12 @@ mod_export zlong
 // whether COLUMNS and LINES should be preserved because they were imported from
 // the environment into a non-interactive shell
 /**/
-mod_export int zterm_columns_preserve, zterm_lines_preserve;
+__thread mod_export int zterm_columns_preserve, zterm_lines_preserve;
 
 /* $FUNCNEST    */
 /**/
 mod_export
-zlong zsh_funcnest =
+__thread zlong zsh_funcnest =
 #ifdef MAX_FUNCTION_DEPTH
     MAX_FUNCTION_DEPTH
 #else
@@ -125,31 +125,31 @@ zlong zsh_funcnest =
     ;
 
 /**/
-zlong lineno,		/* $LINENO      */
+__thread zlong lineno,		/* $LINENO      */
      zoptind,		/* $OPTIND      */
      shlvl;		/* $SHLVL       */
 
 /* $histchars */
  
 /**/
-mod_export unsigned char bangchar;
+__thread mod_export unsigned char bangchar;
 /**/
-unsigned char hatchar, hashchar;
+__thread unsigned char hatchar, hashchar;
 
 /**/
-unsigned char keyboardhackchar = '\0';
+__thread unsigned char keyboardhackchar = '\0';
  
 /* $SECONDS = now.tv_sec - shtimer.tv_sec
  *          + (now.tv_nsec - shtimer.tv_nsec) / 1000000000.0
  * (rounded to an integer if the parameter is not set to float) */
  
 /**/
-struct timespec shtimer;
+__thread struct timespec shtimer;
  
 /* 0 if this $TERM setup is usable, otherwise it contains TERM_* flags */
 
 /**/
-mod_export int termflags;
+__thread mod_export int termflags;
 
 /* Forward declaration */
 
@@ -269,10 +269,10 @@ static const struct gsu_integer zlevar_gsu =
 
 static const struct gsu_integer argc_gsu =
 { poundgetfn, nullintsetfn, stdunsetfn };
-static const struct gsu_array pipestatus_gsu =
+static __thread const struct gsu_array pipestatus_gsu =
 { pipestatgetfn, pipestatsetfn, stdunsetfn };
 
-static const struct gsu_integer rprompt_indent_gsu =
+static __thread const struct gsu_integer rprompt_indent_gsu =
 { intvargetfn, zlevarsetfn, rprompt_indent_unsetfn };
 
 /* Nodes for special parameters for parameter hash table */
@@ -297,7 +297,15 @@ typedef struct iparam {
 } initparam;
 #endif
 
-static initparam special_params[] ={
+/* AOK: special_params's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef initparam aok_tt_special_params[90];
+static __thread aok_tt_special_params aok_tv_special_params;
+static __thread char aok_ti_special_params;
+static aok_tt_special_params *aok_tf_special_params(void) {
+    if (!aok_ti_special_params) {
+        initparam aok_tmp[] = {
 #define GSU(X) BR((GsuScalar)(void *)(&(X)))
 #define NULL_GSU BR((GsuScalar)(void *)NULL)
 #define IPDEF1(A,B,C) {{NULL,A,PM_INTEGER|PM_SPECIAL|C},BR(NULL),GSU(B),10,0,NULL,NULL,NULL,0}
@@ -446,12 +454,29 @@ IPDEF10("pipestatus", pipestatus_gsu),
 
 {{NULL,NULL,0},BR(NULL),NULL_GSU,0,0,NULL,NULL,NULL,0},
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 90,
+                       "special_params: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_special_params, aok_tmp, sizeof(aok_tmp));
+        aok_ti_special_params = 1;
+    }
+    return &aok_tv_special_params;
+}
+#define special_params (*aok_tf_special_params())
+
 
 /*
  * Alternative versions of colon-separated path parameters for
  * sh emulation.  These don't link to the array versions.
  */
-static initparam special_params_sh[] = {
+/* AOK: special_params_sh's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef initparam aok_tt_special_params_sh[9];
+static __thread aok_tt_special_params_sh aok_tv_special_params_sh;
+static __thread char aok_ti_special_params_sh;
+static aok_tt_special_params_sh *aok_tf_special_params_sh(void) {
+    if (!aok_ti_special_params_sh) {
+        initparam aok_tmp[] = {
 IPDEF8("CDPATH", &cdpath, NULL, 0),
 IPDEF8("FIGNORE", &fignore, NULL, 0),
 IPDEF8("FPATH", &fpath, NULL, 0),
@@ -465,14 +490,35 @@ IPDEF8("MODULE_PATH", &module_path, NULL, PM_DONTIMPORT),
 
 {{NULL,NULL,0},BR(NULL),NULL_GSU,0,0,NULL,NULL,NULL,0},
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 9,
+                       "special_params_sh: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_special_params_sh, aok_tmp, sizeof(aok_tmp));
+        aok_ti_special_params_sh = 1;
+    }
+    return &aok_tv_special_params_sh;
+}
+#define special_params_sh (*aok_tf_special_params_sh())
+
 
 /*
  * Special way of referring to the positional parameters.  Unlike $*
  * and $@, this is not readonly.  This parameter is not directly
  * visible in user space.
  */
-static initparam argvparam_pm = IPDEF9("", &pparams, NULL, \
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread initparam aok_tv_argvparam_pm;
+static __thread char aok_ti_argvparam_pm;
+static initparam *aok_tf_argvparam_pm(void) {
+    if (!aok_ti_argvparam_pm) {
+        initparam aok_tmp = IPDEF9("", &pparams, NULL, \
 				 PM_ARRAY|PM_SPECIAL|PM_DONTIMPORT);
+        aok_tv_argvparam_pm = aok_tmp;
+        aok_ti_argvparam_pm = 1;
+    }
+    return &aok_tv_argvparam_pm;
+}
+#define argvparam_pm (*aok_tf_argvparam_pm())
+
 
 #undef BR
 
@@ -490,9 +536,9 @@ static initparam argvparam_pm = IPDEF9("", &pparams, NULL, \
 			  (PM)->gsu.s->setfn(PM,(S)) :			\
 			  (zsfree((PM)->u.str), (PM)->u.str = (S)))
 
-static Param argvparam;
-static Param *argnparams;
-static size_t argnparams_size;
+static __thread Param argvparam;
+static __thread Param *argnparams;
+static __thread size_t argnparams_size;
 
 /*
  * Lists of references to nested variables ("Param" instances) indexed
@@ -519,8 +565,8 @@ static size_t argnparams_size;
  * and parameters that are still unset but no longer hidden are
  * deleted.
  */
-static LinkList *scoperefs = NULL;
-static int scoperefs_num = 0;
+static __thread LinkList *scoperefs = NULL;
+static __thread int scoperefs_num = 0;
 
 /* "parameter table" - hash table containing the parameters
  *
@@ -531,7 +577,7 @@ static int scoperefs_num = 0;
  */
  
 /**/
-mod_export HashTable paramtab, realparamtab;
+__thread mod_export HashTable paramtab, realparamtab;
 
 /**/
 mod_export HashTable
@@ -596,7 +642,7 @@ getparamnode(HashTable ht, const char *nam)
 
 /* Copy a parameter hash table */
 
-static HashTable outtable;
+static __thread HashTable outtable;
 
 /**/
 static void
@@ -626,7 +672,7 @@ copyparamtable(HashTable ht, char *name)
 
 /* Flag to freeparamnode to unset the struct */
 
-static int delunset;
+static __thread int delunset;
 
 /* Function to delete a parameter table. */
 
@@ -642,7 +688,7 @@ deleteparamtable(HashTable t)
     delunset = odelunset;
 }
 
-static unsigned numparamvals;
+static __thread unsigned numparamvals;
 
 /**/
 mod_export void
@@ -653,10 +699,10 @@ scancountparams(UNUSED(HashNode hn), int flags)
 	++numparamvals;
 }
 
-static Patprog scanprog;
-static char *scanstr;
-static char **paramvals;
-static Param foundparam;
+static __thread Patprog scanprog;
+static __thread char *scanstr;
+static __thread char **paramvals;
+static __thread Param foundparam;
 
 /**/
 static void
@@ -2533,7 +2579,7 @@ getstrvalue(Value v)
     return s;
 }
 
-static char *nular[] = {"", NULL};
+static __thread char *nular[] = {"", NULL};
 
 /**/
 mod_export char **
@@ -4005,7 +4051,7 @@ strsetfn(Param pm, char *x)
 
 /* Function to get value of an array parameter */
 
-static char *nullarray = NULL;
+static __thread char *nullarray = NULL;
 
 /**/
 mod_export char **
@@ -4754,7 +4800,7 @@ ifssetfn(UNUSED(Param pm), char *x)
 /* Functions to set value of special parameters `LANG' and `LC_*' */
 
 #ifdef USE_LOCALE
-static struct localename {
+static __thread struct localename {
     char *name;
     int category;
 } lc_names[] = {
@@ -5020,7 +5066,7 @@ errnogetfn(UNUSED(Param pm))
 char *
 keyboardhackgetfn(UNUSED(Param pm))
 {
-    static char buf[2];
+    static __thread char buf[2];
 
     buf[0] = keyboardhackchar;
     buf[1] = '\0';
@@ -5060,7 +5106,7 @@ keyboardhacksetfn(UNUSED(Param pm), char *x)
 char *
 histcharsgetfn(UNUSED(Param pm))
 {
-    static char buf[4];
+    static __thread char buf[4];
 
     buf[0] = bangchar;
     buf[1] = hatchar;
@@ -5844,7 +5890,7 @@ startparamscope(void)
  * Flag that one of the special LC_ functions or LANG changed on scope
  * end
  */
-static int lc_update_needed;
+static __thread int lc_update_needed;
 #endif /* USE_LOCALE */
 
 /* End a parameter scope: delete the parameters local to the scope. */

@@ -162,7 +162,7 @@ getnearestcolor(UNUSED(Hookdef dummy), Color_rgb col)
     return -1;
 }
 
-static struct features module_features = {
+static __thread struct features module_features = {
     NULL, 0,
     NULL, 0,
     NULL, 0,

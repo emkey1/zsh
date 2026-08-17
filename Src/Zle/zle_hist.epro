@@ -2,13 +2,13 @@
 #ifndef have_Src_Zle_zle_hist_globals
 #define have_Src_Zle_zle_hist_globals
 
-extern int lastcol;
-extern int histline;
-extern char*previous_search;
-extern int previous_search_len;
-extern char*previous_aborted_search;
-extern Keymap isearch_keymap;
-extern int have_edits;
+__thread extern int lastcol;
+__thread extern int histline;
+__thread extern char*previous_search;
+__thread extern int previous_search_len;
+__thread extern char*previous_aborted_search;
+__thread extern Keymap isearch_keymap;
+__thread extern int have_edits;
 extern void remember_edits(void);
 extern void forget_edits(void);
 extern int uphistory(UNUSED(char**args));
@@ -41,9 +41,9 @@ extern int historyincrementalsearchforward(char**args);
 extern int historyincrementalpatternsearchbackward(char**args);
 extern int historyincrementalpatternsearchforward(char**args);
 extern void free_isrch_spots(void);
-extern int isearch_active;
-extern int isearch_startpos;
-extern int isearch_endpos;
+__thread extern int isearch_active;
+__thread extern int isearch_startpos;
+__thread extern int isearch_endpos;
 extern int acceptandinfernexthistory(char**args);
 extern int infernexthistory(char**args);
 extern int vifetchhistory(UNUSED(char**args));

@@ -30,8 +30,8 @@
 #include "deltochar.mdh"
 #include "deltochar.pro"
 
-static Widget w_deletetochar;
-static Widget w_zaptochar;
+static __thread Widget w_deletetochar;
+static __thread Widget w_zaptochar;
 
 /**/
 static int
@@ -76,7 +76,7 @@ deltochar(UNUSED(char **args))
 }
 
 
-static struct features module_features = {
+static __thread struct features module_features = {
     NULL, 0,
     NULL, 0,
     NULL, 0,

@@ -34,7 +34,7 @@
  * Can be used to detect if we have a new list.  */
 
 /**/
-mod_export int invcount;
+__thread mod_export int invcount;
 
 #define inststr(X) inststrlen((X),1,-1)
 
@@ -524,8 +524,8 @@ build_pos_string(LinkList list)
 char *
 unambig_data(int *cp, char **pp, char **ip)
 {
-    static char *scache = NULL, *pcache = NULL, *icache = NULL;
-    static int ccache;
+    static __thread char *scache = NULL, *pcache = NULL, *icache = NULL;
+    static __thread int ccache;
 
     if (mnum && ainfo) {
 	if (mnum != unambig_mnum) {
@@ -1490,7 +1490,7 @@ skipnolist(Cmatch *p, int showall)
 mod_export int
 calclist(int showall)
 {
-    static int lastinvcount = -1;
+    static __thread int lastinvcount = -1;
 
     Cmgroup g;
     Cmatch *p, m;

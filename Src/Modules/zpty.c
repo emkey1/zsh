@@ -66,7 +66,7 @@ struct ptycmd {
     int olen;
 };
 
-static Ptycmd ptycmds;
+static __thread Ptycmd ptycmds;
 
 static int
 ptynonblock(int fd)
@@ -197,8 +197,8 @@ getptycmd(char *name)
 static int
 get_pty(int master, int *retfd)
 {
-    static char *name;
-    static int mfd, sfd;
+    static __thread char *name;
+    static __thread int mfd, sfd;
 #ifdef USE_STREAMS_IOCTLS
     int ret;
 #endif
@@ -278,8 +278,8 @@ get_pty(int master, int *retfd)
     static char char2[] = "0123456789abcdef";
 #endif
 
-    static char name[11];
-    static int mfd, sfd;
+    static __thread char name[11];
+    static __thread int mfd, sfd;
     char *p1, *p2;
 
     if (master) {
@@ -922,17 +922,29 @@ ptyhook(UNUSED(Hookdef d), UNUSED(void *dummy))
 }
 
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("zpty", 0, bin_zpty, 0, -1, 0, "ebdmrwLnt", NULL),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 
 /**/

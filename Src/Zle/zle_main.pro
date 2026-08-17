@@ -1,5 +1,5 @@
 /* Generated automatically */
-static int pre_zle_status;
+static __thread int pre_zle_status;
 #ifdef MULTIBYTE_SUPPORT
 #endif
 static int execimmortal(Thingy func,char**args);

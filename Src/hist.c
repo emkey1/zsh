@@ -34,40 +34,40 @@
  * word control. */
 
 /**/
-mod_export int (*hgetc) (void);
+__thread mod_export int (*hgetc) (void);
 
 /**/
-void (*hungetc) (int);
+__thread void (*hungetc) (int);
 
 /**/
-void (*hwaddc) (int);
+__thread void (*hwaddc) (int);
 
 /**/
-void (*hwbegin) (int);
+__thread void (*hwbegin) (int);
 
 /**/
-void (*hwabort) (void);
+__thread void (*hwabort) (void);
 
 /**/
-void (*hwend) (void);
+__thread void (*hwend) (void);
 
 /**/
-void (*addtoline) (int);
+__thread void (*addtoline) (int);
 
 /* != 0 means history substitution is turned off */
  
 /**/
-mod_export int stophist;
+__thread mod_export int stophist;
 
 /* if != 0, we are expanding the current line */
 
 /**/
-mod_export int expanding;
+__thread mod_export int expanding;
 
 /* these are used to modify the cursor position during expansion */
 
 /**/
-mod_export int excs, exlast;
+__thread mod_export int excs, exlast;
 
 /*
  * Current history event number
@@ -85,54 +85,54 @@ mod_export int excs, exlast;
  */
  
 /**/
-mod_export zlong curhist;
+__thread mod_export zlong curhist;
 
 /**/
-struct histent curline;
+__thread struct histent curline;
 
 /* current line count of allocated history entries */
 
 /**/
-zlong histlinect;
+__thread zlong histlinect;
 
 /* The history lines are kept in a hash, and also doubly-linked in a ring */
 
 /**/
-HashTable histtab;
+__thread HashTable histtab;
 /**/
-mod_export Histent hist_ring;
+__thread mod_export Histent hist_ring;
  
 /* capacity of history lists */
  
 /**/
-zlong histsiz;
+__thread zlong histsiz;
  
 /* desired history-file size (in lines) */
  
 /**/
-zlong savehistsiz;
+__thread zlong savehistsiz;
  
 /* if = 1, we have performed history substitution on the current line *
  * if = 2, we have used the 'p' modifier                              */
  
 /**/
-int histdone;
+__thread int histdone;
  
 /* state of the history mechanism */
  
 /**/
-int histactive;
+__thread int histactive;
 
 /* Current setting of the associated option, but sometimes also includes
  * the setting of the HIST_SAVE_NO_DUPS option. */
 
 /**/
-int hist_ignore_all_dups;
+__thread int hist_ignore_all_dups;
 
 /* What flags (if any) we should skip when moving through the history */
 
 /**/
-mod_export int hist_skip_flags;
+__thread mod_export int hist_skip_flags;
 
 /* Bits of histactive variable */
 #define HA_ACTIVE	(1<<0)	/* History mechanism is active */
@@ -144,39 +144,39 @@ mod_export int hist_skip_flags;
 /* Array of word beginnings and endings in current history line. */
 
 /**/
-short *chwords;
+__thread short *chwords;
 
 /* Max, actual position in chwords.
  * nwords = chwordpos/2 because we record beginning and end of words.
  */
 
 /**/
-int chwordlen, chwordpos;
+__thread int chwordlen, chwordpos;
 
 /* the last l for s/l/r/ history substitution */
  
 /**/
-char *hsubl;
+__thread char *hsubl;
 
 /* the last r for s/l/r/ history substitution */
  
 /**/
-char *hsubr;
+__thread char *hsubr;
  
 /* state of histsubstpattern at last substitution */
 
 /**/
-int hsubpatopt;
+__thread int hsubpatopt;
 
 /* pointer into the history line */
  
 /**/
-mod_export char *hptr;
+__thread mod_export char *hptr;
  
 /* the current history line */
  
 /**/
-mod_export char *chline;
+__thread mod_export char *chline;
 
 /*
  * The current history line as seen by ZLE.
@@ -192,32 +192,32 @@ mod_export char *chline;
  */
 
 /**/
-mod_export char *zle_chline;
+__thread mod_export char *zle_chline;
 
 /* true if the last character returned by hgetc was an escaped bangchar *
  * if it is set and NOBANGHIST is unset hwaddc escapes bangchars        */
 
 /**/
-int qbang;
+__thread int qbang;
  
 /* max size of histline */
  
 /**/
-int hlinesz;
+__thread int hlinesz;
  
 /* default event (usually curhist-1, that is, "!!") */
  
-static zlong defev;
+static __thread zlong defev;
 
 /*
  * Flag that we stopped reading line when we got to a comment,
  * but we want to keep it in the histofy even if there were no words
  * (i.e. the comment was the entire line).
  */
-static int hist_keep_comment;
+static __thread int hist_keep_comment;
 
 /* Remember the last line in the history file so we can find it again. */
-static struct histfile_stats {
+static __thread struct histfile_stats {
     char *text;
     time_t stim, mtim;
     off_t fpos, fsiz;
@@ -225,7 +225,7 @@ static struct histfile_stats {
     zlong next_write_ev;
 } lasthist;
 
-static struct histsave {
+static __thread struct histsave {
     struct histfile_stats lasthist;
     char *histfile;
     HashTable histtab;
@@ -237,10 +237,10 @@ static struct histsave {
     zlong savehistsiz;
     int locallevel;
 } *histsave_stack;
-static int histsave_stack_size = 0;
-static int histsave_stack_pos = 0;
+static __thread int histsave_stack_size = 0;
+static __thread int histsave_stack_pos = 0;
 
-static zlong histfile_linect;
+static __thread zlong histfile_linect;
 
 /* save history context */
 
@@ -597,8 +597,8 @@ histsubchar(int c)
 {
     int farg, evset = -1, larg, argc, cflag = 0, bflag = 0;
     zlong ev;
-    static int marg = -1;
-    static zlong mev = -1;
+    static __thread int marg = -1;
+    static __thread zlong mev = -1;
     char *buf, *ptr;
     char *sline;
     int lexraw_mark;
@@ -1347,14 +1347,14 @@ gethistent(zlong ev, int nearmatch)
 static void
 putoldhistentryontop(short keep_going)
 {
-    static Histent next = NULL;
+    static __thread Histent next = NULL;
     Histent he = (keep_going || !hist_ring) ? next : hist_ring->down;
     if (he)
 	next = he->down;
     else
 	return;
     if (isset(HISTEXPIREDUPSFIRST) && !(he->node.flags & HIST_DUP)) {
-	static zlong max_unique_ct = 0;
+	static __thread zlong max_unique_ct = 0;
 	if (!keep_going)
 	    max_unique_ct = savehistsiz;
 	do {
@@ -2871,7 +2871,7 @@ readhistfile(char *fn, int err, int readflags)
 }
 
 #ifdef HAVE_FCNTL_H
-static int flock_fd = -1;
+static __thread int flock_fd = -1;
 
 /*
  * Lock file using fcntl().  Return 0 on success, 1 on failure of
@@ -3142,7 +3142,7 @@ savehistfile(char *fn, int err, int writeflags)
     unlockhistfile(fn);
 }
 
-static int lockhistct;
+static __thread int lockhistct;
 
 static int
 checklocktime(char *lockfile, long *sleep_usp, time_t then)

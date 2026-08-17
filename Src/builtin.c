@@ -37,7 +37,7 @@
 
 /* Builtins in the main executable */
 
-static struct builtin builtins[] =
+static __thread struct builtin builtins[] =
 {
     BIN_PREFIX("-", BINF_DASH),
     BIN_PREFIX("builtin", BINF_BUILTIN),
@@ -143,7 +143,7 @@ static struct builtin builtins[] =
 /* hash table containing builtin commands */
 
 /**/
-mod_export HashTable builtintab;
+__thread mod_export HashTable builtintab;
 
 /**/
 void
@@ -720,7 +720,7 @@ bin_set(char *nam, char **args, UNUSED(Options ops), UNUSED(int func))
 /**** directory-handling builtins ****/
 
 /**/
-int doprintdir = 0;		/* set in exec.c (for autocd, cdpath, etc.) */
+__thread int doprintdir = 0;		/* set in exec.c (for autocd, cdpath, etc.) */
 
 /* pwd: display the name of the current directory */
 
@@ -741,7 +741,7 @@ bin_pwd(UNUSED(char *name), UNUSED(char **argv), Options ops, UNUSED(int func))
 /* the directory stack */
 
 /**/
-mod_export LinkList dirstack;
+__thread mod_export LinkList dirstack;
 
 /* dirs: list the directory stack, or replace it with a provided list */
 
@@ -828,7 +828,7 @@ set_pwd_env(void)
 }
 
 /* set if we are resolving links to their true paths */
-static int chasinglinks;
+static __thread int chasinglinks;
 
 /* The main pwd changing function.  The real work is done by other     *
  * functions.  cd_get_dest() does the initial argument processing;     *
@@ -1909,7 +1909,7 @@ static Asgment
 getasg(char ***argvp, LinkList assigns)
 {
     char *s = **argvp;
-    static struct asgment asg;
+    static __thread struct asgment asg;
 
     /* sanity check for valid argument */
     if (!s) {
@@ -3950,7 +3950,7 @@ bin_unset(char *name, char **argv, Options ops, int func)
 
 /* type, whence, which, command */
 
-static LinkList matchednodes;
+static __thread LinkList matchednodes;
 
 static void
 fetchcmdnamnode(HashNode hn, UNUSED(int printflags))
@@ -4553,7 +4553,7 @@ bin_false(UNUSED(char *name), UNUSED(char **argv), UNUSED(Options ops), UNUSED(i
 /* the zle buffer stack */
 
 /**/
-mod_export LinkList bufstack;
+__thread mod_export LinkList bufstack;
 
 /* echo, print, printf, pushln */
 
@@ -5652,7 +5652,7 @@ bin_shift(char *name, char **argv, Options ops, UNUSED(int func))
  */
 
 /**/
-int optcind;
+__thread int optcind;
 
 /* getopts: automagical option handling for shell scripts */
 
@@ -5786,16 +5786,16 @@ bin_getopts(UNUSED(char *name), char **argv, Options ops, UNUSED(int func))
  */
 
 /**/
-mod_export volatile int exit_pending;
+__thread mod_export volatile int exit_pending;
 
 /* Shell level at which we exit if exit_pending */
 /**/
-mod_export volatile int exit_level;
+__thread mod_export volatile int exit_level;
 
 /* we have printed a 'you have stopped (running) jobs.' message */
 
 /**/
-mod_export volatile int stopmsg;
+__thread mod_export volatile int stopmsg;
 
 /* break, bye, continue, exit, logout, return -- most of these take   *
  * one numeric argument, and the other (logout) is related to return. *
@@ -5923,7 +5923,7 @@ checkjobs(void)
  */
 
 /**/
-int shell_exiting;
+__thread int shell_exiting;
 
 /*
  * Exit status if explicitly set by an exit command.
@@ -5937,7 +5937,7 @@ int shell_exiting;
  * bugs.  (C.f. the entire rest of the shell.)
  */
 /**/
-int exit_val;
+__thread int exit_val;
 
 /*
  * Actually exit the shell, working out the status locally.
@@ -6383,7 +6383,7 @@ restore:
 /* eval: simple evaluation */
 
 /**/
-mod_export int ineval;
+__thread mod_export int ineval;
 
 /**/
 int
@@ -6392,8 +6392,8 @@ bin_eval(UNUSED(char *nam), char **argv, UNUSED(Options ops), UNUSED(int func))
     return eval(argv);
 }
 
-static char *zbuf;
-static int readfd;
+static __thread char *zbuf;
+static __thread int readfd;
 
 /* Read a character from readfd, or from the buffer zbuf.  Return EOF on end of
 file/buffer. */
@@ -7188,7 +7188,7 @@ zread(int izle, int *readchar, long izle_timeout)
 
 /* holds arguments for testlex() */
 /**/
-char **testargs, **curtestarg;
+__thread char **testargs, **curtestarg;
 
 /* test, [: the old-style general purpose logical expression builtin */
 

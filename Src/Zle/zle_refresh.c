@@ -50,7 +50,7 @@
  * where N >= 1 is the number of trailing zero width characters), followed by
  * those characters.
  */
-static REFRESH_CHAR
+static __thread REFRESH_CHAR
     *omwbuf = NULL,		/* old multiword glyph buffer */
     *nmwbuf = NULL;		/* new multiword glyph buffer */
 #endif
@@ -144,17 +144,17 @@ ZR_strncmp(const REFRESH_ELEMENT *oldwstr, const REFRESH_ELEMENT *newwstr,
  */
 
 /**/
-char *lpromptbuf, *rpromptbuf;
+__thread char *lpromptbuf, *rpromptbuf;
 
 /* Text attributes after displaying prompts */
 
 /**/
-zattr pmpt_attr, rpmpt_attr, prompt_attr;
+__thread zattr pmpt_attr, rpmpt_attr, prompt_attr;
 
 /* number of lines displayed */
 
 /**/
-mod_export int nlnct;
+__thread mod_export int nlnct;
 
 /* Most lines of the buffer we've shown at once with the current list *
  * showing.  == 0 if there is no list.  == -1 if a new list has just  *
@@ -162,44 +162,44 @@ mod_export int nlnct;
  * list.                                                              */
 
 /**/
-mod_export int showinglist;
+__thread mod_export int showinglist;
 
 /* > 0 if a completion list is displayed below the prompt,
  * < 0 if a list is displayed above the prompt. */
 
 /**/
-mod_export int listshown;
+__thread mod_export int listshown;
 
 /* Length of last list displayed (if it is below the prompt). */
 
 /**/
-mod_export int lastlistlen;
+__thread mod_export int lastlistlen;
 
 /* Non-zero if ALWAYS_LAST_PROMPT has been used, meaning that the *
  * screen below the buffer display should not be cleared by       *
  * zrefresh(), but should be by trashzle().                       */
 
 /**/
-mod_export int clearflag;
+__thread mod_export int clearflag;
 
 /* Non-zero if zrefresh() should clear the list below the prompt. */
 
 /**/
-mod_export int clearlist;
+__thread mod_export int clearlist;
 
 /* Zle in trashed state - updates may be subtly altered */
 
 /**/
-int trashedzle;
+__thread int trashedzle;
 
 /*
  * Information used by PREDISPLAY and POSTDISPLAY parameters which
  * add non-editable text to that being displayed.
  */
 /**/
-ZLE_STRING_T predisplay, postdisplay;
+__thread ZLE_STRING_T predisplay, postdisplay;
 /**/
-int predisplaylen, postdisplaylen;
+__thread int predisplaylen, postdisplaylen;
 
 
 /*
@@ -208,13 +208,13 @@ int predisplaylen, postdisplaylen;
  * and for ellipsis continuation markers.
  */
 
-static zattr default_attr, default_mask, special_attr, special_mask, ellipsis_attr;
+static __thread zattr default_attr, default_mask, special_attr, special_mask, ellipsis_attr;
 
 /*
  * Layer applied to highlighting for special characters
  */
 
-static int special_layer;
+static __thread int special_layer;
 
 /*
  * Array of region highlights, no special termination.
@@ -224,31 +224,31 @@ static int special_layer;
  */
 
 /**/
-struct region_highlight *region_highlights;
+__thread struct region_highlight *region_highlights;
 
 /*
  * Number of elements in region_highlights.
  * This includes the special elements above.
  */
 /**/
-int n_region_highlights;
+__thread int n_region_highlights;
 
 /*
  * Flag that highlighting of the region is active.
  */
 /**/
-int region_active;
+__thread int region_active;
 
 /*
  * Name of function to use to output termcap values, if defined.
  */
 /**/
-char *tcout_func_name;
+__thread char *tcout_func_name;
 
 #ifdef HAVE_SELECT
 /* cost of last update */
 /**/
-int cost;
+__thread int cost;
 
 # define SELECT_ADD_COST(X)	(cost += X)
 # define zputc(a)		(zwcputc(a), cost++)
@@ -666,10 +666,10 @@ zwcwrite(const REFRESH_STRING s, size_t i)
    I've put my fingers into just about every routine in here -
    any queries about updates to mason@primenet.com.au */
 
-static REFRESH_STRING 
+static __thread REFRESH_STRING 
     *nbuf = NULL,		/* new video buffer line-by-line array */
     *obuf = NULL;		/* old video buffer line-by-line array */
-static int more_start,		/* more text before start of screen?	    */
+static __thread int more_start,		/* more text before start of screen?	    */
     more_end,			/* more stuff after end of screen?	    */
     olnct,			/* previous number of lines		    */
     ovln,			/* previous video cursor position line	    */
@@ -685,7 +685,7 @@ static int more_start,		/* more text before start of screen?	    */
     winw_alloc = -1,		/* allocated window width */
     winh_alloc = -1;		/* allocates window height */
 #ifdef MULTIBYTE_SUPPORT
-static int
+static __thread int
     omw_size,			/* allocated size of omwbuf */
     nmw_size,			/* allocated size of nmwbuf */
     nmw_ind;			/* next insert point in nmwbuf */
@@ -824,7 +824,7 @@ struct rparams {
 };
 typedef struct rparams *Rparams;
 
-static int cleareol,		/* clear to end-of-line (if can't cleareod) */
+static __thread int cleareol,		/* clear to end-of-line (if can't cleareod) */
     clearf,			/* alwayslastprompt used immediately before */
     put_rpmpt,			/* whether we should display right-prompt   */
     oput_rpmpt,			/* whether displayed right-prompt last time */
@@ -974,7 +974,7 @@ bufswap(void)
 mod_export void
 zrefresh(void)
 {
-    static int inlist;		/* avoiding recursion			     */
+    static __thread int inlist;		/* avoiding recursion			     */
     int iln;			/* current line as index in loops	     */
     int t0 = -1;		/* tmp					     */
     ZLE_STRING_T tmpline,	/* line with added pre/post text	     */
@@ -1824,7 +1824,7 @@ refreshline(int ln)
 	ollen = ZR_strlen(ol);
     }
     else {
-	static REFRESH_ELEMENT nullchr = { ZWC('\0'), 0 };
+	static __thread REFRESH_ELEMENT nullchr = { ZWC('\0'), 0 };
 	ol = &nullchr;
 	ollen = 0;
     }

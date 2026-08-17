@@ -146,7 +146,7 @@ enum {
 
 typedef struct zftpcmd *Zftpcmd;
 
-static struct zftpcmd zftpcmdtab[] = {
+static __thread struct zftpcmd zftpcmdtab[] = {
     { "open", zftp_open, 0, 4, 0 },
     { "params", zftp_params, 0, 4, 0 },
     { "login", zftp_login, 0, 3, ZFTP_CONN },
@@ -181,7 +181,7 @@ static struct zftpcmd zftpcmdtab[] = {
     { 0, 0, 0, 0, 0 }
 };
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("zftp", 0, bin_zftp, 1, -1, 0, NULL, NULL),
 };
 
@@ -190,7 +190,7 @@ static struct builtin bintab[] = {
  * closes.  any special params are handled, well, specially.
  * currently there aren't any, which is the way I like it.
  */
-static char *zfparams[] = {
+static __thread char *zfparams[] = {
     "ZFTP_HOST", "ZFTP_PORT", "ZFTP_IP", "ZFTP_SYSTEM", "ZFTP_USER",
     "ZFTP_ACCOUNT", "ZFTP_PWD", "ZFTP_TYPE", "ZFTP_MODE", NULL
 };
@@ -204,24 +204,24 @@ enum {
 };
 
 /* Number of connections actually open */
-static int zfnopen;
+static __thread int zfnopen;
 
 /*
  * zcfinish = 0 keep going
  *            1 line finished, alles klar
  *            2 EOF
  */
-static int zcfinish;
+static __thread int zcfinish;
 /* zfclosing is set if zftp_close() is active */
-static int zfclosing;
+static __thread int zfclosing;
 
 /*
  * Stuff about last message:  last line of message and status code.
  * The reply is also stored in $ZFTP_REPLY; we keep these separate
  * for convenience.
  */
-static char *lastmsg, lastcodestr[4];
-static int lastcode;
+static __thread char *lastmsg, lastcodestr[4];
+static __thread int lastcode;
 
 /* remote system has size, mdtm commands */
 enum {
@@ -269,7 +269,7 @@ enum {
 #define ZFST_MODE(x) (x & ZFST_MMSK)
 
 /* fd containing status for all sessions and array for internal use */
-static int zfstatfd = -1, *zfstatusp;
+static __thread int zfstatfd = -1, *zfstatusp;
 
 /* Preferences, read in from the `zftp_prefs' array variable */
 enum {
@@ -279,7 +279,7 @@ enum {
 };
 
 /* The flags as stored internally. */
-static int zfprefs;
+static __thread int zfprefs;
 
 /*
  * Data node for linked list of sessions.
@@ -304,16 +304,16 @@ struct zftp_session {
 };
 
 /* List of active sessions */
-static LinkList zfsessions;
+static __thread LinkList zfsessions;
 
 /* Current session */
-static Zftp_session zfsess;
+static __thread Zftp_session zfsess;
 
 /* Number of current session, corresponding to position in list */
-static int zfsessno;
+static __thread int zfsessno;
 
 /* Total number of sessions */
-static int zfsesscnt;
+static __thread int zfsesscnt;
 
 /*
  * Bits and pieces for dealing with SIGALRM (and SIGPIPE, but that's
@@ -340,10 +340,10 @@ static int zfsesscnt;
  */
 
 /* flags for alarm set, alarm gone off */
-static int zfalarmed, zfdrrrring;
+static __thread int zfalarmed, zfdrrrring;
 /* remember old alarm status */
-static time_t oaltime;
-static unsigned int oalremain;
+static __thread time_t oaltime;
+static __thread unsigned int oalremain;
 
 /*
  * Where to jump to when the alarm goes off.  This is much
@@ -353,7 +353,7 @@ static unsigned int oalremain;
  *
  * gcc -O gives apparently spurious `may be clobbered by longjmp' warnings.
  */
-static jmp_buf zfalrmbuf;
+static __thread jmp_buf zfalrmbuf;
 
 /* The signal handler itself */
 
@@ -1347,7 +1347,7 @@ zfwrite(int fd, char *bf, off_t sz, int tmout)
     return ret;
 }
 
-static int zfread_eof;
+static __thread int zfread_eof;
 
 /* Version of zfread when we need to read in block mode. */
 
@@ -3161,13 +3161,25 @@ zftpexithook(UNUSED(Hookdef d), UNUSED(void *dummy))
     return 0;
 }
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /* The load/unload routines required by the zsh library interface */
 

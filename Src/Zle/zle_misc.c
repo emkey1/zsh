@@ -520,13 +520,13 @@ copyregionaskill(char **args)
  * kct: index into kill ring, or -1 for original cutbuffer of yank.
  * yankcs marks the cursor position preceding the last yank
  */
-static int kct, yankcs;
+static __thread int kct, yankcs;
 
 /**/
-int yankb, yanke; /* mark the start and end of last yank in editing buffer. */
+__thread int yankb, yanke; /* mark the start and end of last yank in editing buffer. */
 
 /* The original cutbuffer, either cutbuf or one of the vi buffers. */
-static Cutbuffer kctbuf;
+static __thread Cutbuffer kctbuf;
 
 /**/
 int
@@ -1241,9 +1241,9 @@ makequote(ZLE_STRING_T str, size_t *len)
  * cmdstr is the buffer used for execute-named-command converted
  * to a metafied multibyte string.
  */
-static char *namedcmdstr;
-static LinkList namedcmdll;
-static int namedcmdambig;
+static __thread char *namedcmdstr;
+static __thread LinkList namedcmdll;
+static __thread int namedcmdambig;
 
 /**/
 static void
@@ -1269,7 +1269,7 @@ scancompcmd(HashNode hn, UNUSED(int flags))
  */
 
 /**/
-Keymap command_keymap;
+__thread Keymap command_keymap;
 
 /**/
 Thingy
@@ -1552,21 +1552,21 @@ struct suffixset {
 };
 
 /* The list of suffix structures */
-static struct suffixset *suffixlist;
+static __thread struct suffixset *suffixlist;
 
 /* Shell function to call to remove the suffix. */
 
 /**/
-static char *suffixfunc;
+static __thread char *suffixfunc;
 
 /* Whether to remove suffix on uninsertable characters */
 /**/
-int suffixnoinsrem;
+__thread int suffixnoinsrem;
 
 /* Length of the currently active, auto-removable suffix. */
 /**/
 mod_export int
-suffixlen;
+__thread suffixlen;
 
 /**/
 mod_export void

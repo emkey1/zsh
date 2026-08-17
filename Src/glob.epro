@@ -2,11 +2,11 @@
 #ifndef have_Src_glob_globals
 #define have_Src_glob_globals
 
-extern int badcshglob;
-extern int pathpos;
-extern char*pathbuf;
-extern mod_import_variable char*glob_pre;
-extern mod_import_variable char*glob_suf;
+__thread extern int badcshglob;
+__thread extern int pathpos;
+__thread extern char*pathbuf;
+__thread extern mod_import_variable char*glob_pre;
+__thread extern mod_import_variable char*glob_suf;
 extern int checkglobqual(char*str,int sl,int nobareglob,char**sp);
 extern void zglob(LinkList list,LinkNode np,int nountok);
 extern mod_import_function char file_type(mode_t filemode);

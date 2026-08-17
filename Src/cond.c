@@ -31,9 +31,9 @@
 #include "cond.pro"
 
 /**/
-int tracingcond;    /* updated by execcond() in exec.c */
+__thread int tracingcond;    /* updated by execcond() in exec.c */
 
-static char *condstr[COND_MOD] = {
+static __thread char *condstr[COND_MOD] = {
     "!", "&&", "||", "=", "==", "!=", "<", ">", "-nt", "-ot", "-ef", "-eq",
     "-ne", "-lt", "-gt", "-le", "-ge", "=~"
 };
@@ -445,7 +445,7 @@ doaccess(char *s, int c)
 }
 
 
-static struct stat st;
+static __thread struct stat st;
 
 /**/
 static struct stat *

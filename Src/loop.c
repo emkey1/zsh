@@ -33,17 +33,17 @@
 /* # of nested loops we are in */
  
 /**/
-int loops;
+__thread int loops;
  
 /* # of continue levels */
  
 /**/
-mod_export int contflag;
+__thread mod_export int contflag;
  
 /* # of break levels */
  
 /**/
-mod_export volatile int breaks;
+__thread mod_export volatile int breaks;
 
 /**/
 int
@@ -716,7 +716,7 @@ execcase(Estate state, int do_exec)
 
 /**/
 zlong
-try_errflag = -1;
+__thread try_errflag = -1;
 
 /**
  * Corresponding interrupt error status form `try' block.
@@ -724,11 +724,11 @@ try_errflag = -1;
 
 /**/
 zlong
-try_interrupt = -1;
+__thread try_interrupt = -1;
 
 /**/
 zlong
-try_tryflag = 0;
+__thread try_tryflag = 0;
 
 /**/
 int

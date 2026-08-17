@@ -147,13 +147,13 @@
 #  define WATCH_WTMP_FILE "/dev/null"
 # endif
 
-static int wtabsz = 0;
-static WATCH_STRUCT_UTMP *wtab = NULL;
+static __thread int wtabsz = 0;
+static __thread WATCH_STRUCT_UTMP *wtab = NULL;
 
 /* the last time we checked the people in the WATCH variable */
-static time_t lastwatch;
+static __thread time_t lastwatch;
 
-static time_t lastutmpcheck = 0;
+static __thread time_t lastutmpcheck = 0;
 
 /* get the time of login/logout for WATCH */
 
@@ -672,13 +672,13 @@ bin_log(UNUSED(char *nam), UNUSED(char **argv), UNUSED(Options ops), UNUSED(int 
 
 #else /* !WATCH_STRUCT_UTMP */
 
-static void
+static __thread void
 checksched(void)
 {
 }
 
 /**/
-static int
+static __thread int
 bin_log(char *nam, char **argv, Options ops, int func)
 {
     return bin_notavail(nam, argv, ops, func);
@@ -687,28 +687,57 @@ bin_log(char *nam, char **argv, Options ops, int func)
 #endif /* !WATCH_STRUCT_UTMP */
 
 /**/
-static char **watch; /* $watch */
+static __thread char **watch; /* $watch */
 
 /* module setup */
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("log", 0, bin_log, 0, 0, 0, NULL, NULL),
 };
 
-static struct paramdef partab[] = {
+/* AOK: partab's initialiser takes the address of a thread-local,
+   so it cannot be a static initialiser any more. See
+   tools/zsh-tls-fix-tables.py. */
+typedef struct paramdef aok_tt_partab[2];
+static __thread aok_tt_partab aok_tv_partab;
+static __thread char aok_ti_partab;
+static aok_tt_partab *aok_tf_partab(void) {
+    if (!aok_ti_partab) {
+        struct paramdef aok_tmp[] = {
     PARAMDEF("WATCH", PM_SCALAR|PM_SPECIAL|PM_TIED, &watch,
 	     NULL /* &colonarr_gsu (see setup_()) */),
     PARAMDEF("watch", PM_ARRAY|PM_SPECIAL|PM_TIED, &watch,
 	     NULL /* &vararray_gsu (see setup_() */),
 };
+        _Static_assert(sizeof(aok_tmp)/sizeof(aok_tmp[0]) == 2,
+                       "partab: zsh-tls-fix-tables miscounted");
+        memcpy(aok_tv_partab, aok_tmp, sizeof(aok_tmp));
+        aok_ti_partab = 1;
+    }
+    return &aok_tv_partab;
+}
+#define partab (*aok_tf_partab())
 
-static struct features module_features = {
+
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     partab, sizeof(partab)/sizeof(*partab),
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

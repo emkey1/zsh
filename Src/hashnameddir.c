@@ -45,12 +45,12 @@
 /* hash table containing named directories */
 
 /**/
-mod_export HashTable nameddirtab;
+__thread mod_export HashTable nameddirtab;
 
 /* != 0 if all the usernames have already been *
  * added to the named directory hash table.    */
 
-static int allusersadded;
+static __thread int allusersadded;
 
 /* Create new hash table for named directories */
 

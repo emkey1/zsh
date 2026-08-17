@@ -2,10 +2,10 @@
 #ifndef have_Src_input_globals
 #define have_Src_input_globals
 
-extern int SHIN;
-extern int strin;
-extern mod_import_variable int inbufct;
-extern int inbufflags;
+__thread extern int SHIN;
+__thread extern int strin;
+__thread extern mod_import_variable int inbufct;
+__thread extern int inbufflags;
 extern void shinbufreset(void);
 extern void shinbufalloc(void);
 extern void shinbufsave(void);

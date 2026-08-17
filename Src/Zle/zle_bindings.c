@@ -38,44 +38,105 @@
  * by address from within the table of thingies (below).  The only
  * complication here is that not all systems support union
  * initialisation.
- */
-
-static
-#ifdef HAVE_UNION_INIT
-# define BR(X) {X}
-struct widget
-#else /* !HAVE_UNION_INIT */
-# define BR(X) X
-struct intwidget {
-    int flags;
-    Thingy first;
-    ZleIntFunc fn;
-}
-#endif /* !HAVE_UNION_INIT */
-widgets[] = {
-#define W(zle_flags, t_firstname, functionname) \
-    { WIDGET_INT | zle_flags, t_firstname, BR(functionname) },
-#include "widgets.list"
-#undef W
-};
-
-/*
+ *
  * thingies is the table of `known thingies', that exist on startup.
  * Some bits of ZLE rely on some of these thingies always being the
  * ones in this table, rather than doing a name lookup and accepting
  * any semantically identical thingy.  The initial reference count of
  * these thingies is 2: 1 for the widget they name, and 1 extra to
  * make sure they never get deleted.
+ *
+ * AOK: both tables are per-shell rather than per-process, because both are
+ * mutable and two native zsh shells are two threads of one process.  The long
+ * version of why, and of why `static __thread' alone will not do it, is on
+ * thingies[] in zle.h.  What is left here is the mechanism.
+ *
+ * Each table's storage is thread-local and its initialiser has moved into an
+ * accessor that runs on first touch, which is the shape
+ * tools/zsh-tls-fix-tables.py generates for the same wall elsewhere in the
+ * tree.  The element counts come from counting the SAME list files with the
+ * same macro that fills the tables, so a table and its bound cannot drift
+ * apart the way a hand-written count would.
  */
 
-/**/
-mod_export struct thingy thingies[] = {
+#ifdef HAVE_UNION_INIT
+# define BR(X) {X}
+# define AOK_WIDGET struct widget
+#else /* !HAVE_UNION_INIT */
+# define BR(X) X
+struct intwidget {
+    int flags;
+    Thingy first;
+    ZleIntFunc fn;
+};
+# define AOK_WIDGET struct intwidget
+#endif /* !HAVE_UNION_INIT */
+
+enum {
+    aok_n_widgets = 0
+#define W(zle_flags, t_firstname, functionname) + 1
+#include "widgets.list"
+#undef W
+};
+
+typedef AOK_WIDGET aok_tt_widgets[aok_n_widgets];
+
+static __thread aok_tt_widgets aok_tv_widgets;
+static __thread char aok_ti_widgets;
+static __thread aok_tt_thingies aok_tv_thingies;
+static __thread char aok_ti_thingies;
+
+static aok_tt_widgets *aok_tf_widgets(void);
+
+/* Both accessors are in scope from here down, so the list files can name each
+ * other's entries exactly as they always did. */
+#define widgets (*aok_tf_widgets())
+
+/*
+ * The two initialisers are mutually recursive: a widget's `first' is the
+ * address of a thingy, a thingy's `widget' is the address of a widget, and a
+ * thingy's `samew' is the address of another thingy.  So the done flag is
+ * raised BEFORE the initialiser runs rather than after.  Every one of those
+ * cross-references is an address-of and none of them reads through the pointer
+ * at this point, and a thread-local object has its final address from the
+ * moment the thread can name it -- so a re-entrant call hands back that
+ * address and returns immediately, the outer call goes on to fill the storage
+ * in, and both tables end up complete.  Raising the flag afterwards instead
+ * would recurse until the stack ran out.
+ */
+
+static aok_tt_widgets *
+aok_tf_widgets(void)
+{
+    if (!aok_ti_widgets) {
+	int i = 0;
+	aok_ti_widgets = 1;
+#define W(zle_flags, t_firstname, functionname) \
+	aok_tv_widgets[i++] = (AOK_WIDGET) \
+	    { WIDGET_INT | zle_flags, t_firstname, BR(functionname) };
+#include "widgets.list"
+#undef W
+	DPUTS(i != aok_n_widgets, "BUG: widgets[] filled to the wrong length");
+    }
+    return &aok_tv_widgets;
+}
+
+aok_tt_thingies *
+aok_tf_thingies(void)
+{
+    if (!aok_ti_thingies) {
+	int i = 0;
+	aok_ti_thingies = 1;
 #define T(name, th_flags, w_idget, t_next) \
-    { NULL, name, th_flags, 2, w_idget, t_next },
+	aok_tv_thingies[i++] = (struct thingy) \
+	    { NULL, name, th_flags, 2, w_idget, t_next };
 #include "thingies.list"
 #undef T
-    { NULL, NULL, 0, 0, NULL, NULL }
-};
+	aok_tv_thingies[i++] = (struct thingy) { NULL, NULL, 0, 0, NULL, NULL };
+	DPUTS(i != aok_n_thingies, "BUG: thingies[] filled to the wrong length");
+    }
+    return &aok_tv_thingies;
+}
 
 /*
  * Default key binding tables:
@@ -85,7 +146,7 @@ mod_export struct thingy thingies[] = {
  */
 
 /**/
-int emacsbind[32] = {
+__thread int emacsbind[32] = {
     /* ^@ */ z_setmarkcommand,
     /* ^A */ z_beginningofline,
     /* ^B */ z_backwardchar,
@@ -121,7 +182,7 @@ int emacsbind[32] = {
 };
 
 /**/
-int metabind[128] = {
+__thread int metabind[128] = {
     /* M-^@ */ z_undefinedkey,
     /* M-^A */ z_undefinedkey,
     /* M-^B */ z_undefinedkey,
@@ -253,7 +314,7 @@ int metabind[128] = {
 };
 
 /**/
-int viinsbind[32] = {
+__thread int viinsbind[32] = {
     /* ^@ */ z_undefinedkey,
     /* ^A */ z_selfinsert,
     /* ^B */ z_selfinsert,
@@ -289,7 +350,7 @@ int viinsbind[32] = {
 };
 
 /**/
-int vicmdbind[128] = {
+__thread int vicmdbind[128] = {
     /* ^@ */ z_undefinedkey,
     /* ^A */ z_undefinedkey,
     /* ^B */ z_undefinedkey,

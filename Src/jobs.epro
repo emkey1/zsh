@@ -2,24 +2,24 @@
 #ifndef have_Src_jobs_globals
 #define have_Src_jobs_globals
 
-extern pid_t origpgrp;
-extern mod_import_variable pid_t mypgrp;
-extern pid_t last_attached_pgrp;
-extern mod_import_variable int thisjob;
-extern mod_import_variable int curjob;
-extern mod_import_variable int prevjob;
-extern mod_import_variable struct job*jobtab;
-extern mod_import_variable int jobtabsize;
-extern mod_import_variable int maxjob;
+__thread extern pid_t origpgrp;
+__thread extern mod_import_variable pid_t mypgrp;
+__thread extern pid_t last_attached_pgrp;
+__thread extern mod_import_variable int thisjob;
+__thread extern mod_import_variable int curjob;
+__thread extern mod_import_variable int prevjob;
+__thread extern mod_import_variable struct job*jobtab;
+__thread extern mod_import_variable int jobtabsize;
+__thread extern mod_import_variable int maxjob;
 #ifdef HAVE_GETRUSAGE
 #else
 #endif
-extern mod_import_variable int ttyfrozen;
-extern int prev_errflag;
-extern int prev_breaks;
-extern int errbrk_saved;
-extern int numpipestats;
-extern int pipestats[MAX_PIPESTATS];
+__thread extern mod_import_variable int ttyfrozen;
+__thread extern int prev_errflag;
+__thread extern int prev_breaks;
+__thread extern int errbrk_saved;
+__thread extern int numpipestats;
+__thread extern int pipestats[MAX_PIPESTATS];
 extern void makerunning(Job jn);
 extern int findproc(pid_t pid,Job*jptr,Process*pptr,int aux);
 extern int hasprocs(int job);

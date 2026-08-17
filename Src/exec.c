@@ -29,6 +29,7 @@
 
 #include "zsh.mdh"
 #include "exec.pro"
+#include "aok_fork.h"
 
 /* Flags for last argument of addvars */
 
@@ -69,7 +70,7 @@ typedef struct funcsave *Funcsave;
  */
 
 /**/
-int noerrexit;
+__thread int noerrexit;
 
 /*
  * Used to suppress ERREXIT and ERRRETURN for the command under
@@ -106,7 +107,7 @@ int noerrexit;
  */
 
 /**/
-int this_noerrexit;
+__thread int this_noerrexit;
 
 /*
  * noerrs = 1: suppress error messages
@@ -114,24 +115,24 @@ int this_noerrexit;
  */
 
 /**/
-mod_export int noerrs;
+__thread mod_export int noerrs;
 
 /* do not save history on exec and exit */
 
 /**/
-int nohistsave;
+__thread int nohistsave;
 
 /* error flag: bits from enum errflag_bits */
 
 /**/
-mod_export volatile int errflag;
+__thread mod_export volatile int errflag;
 
 /*
  * State of trap return value.  Value is from enum trap_state.
  */
 
 /**/
-int trap_state;
+__thread int trap_state;
 
 /*
  * Value associated with return from a trap.
@@ -152,20 +153,20 @@ int trap_state;
  */
 
 /**/
-int trap_return;
+__thread int trap_return;
 
 /* != 0 if this is a subshell */
 
 /**/
-int subsh;
+__thread int subsh;
 
 /* != 0 if we have a return pending */
 
 /**/
-mod_export volatile int retflag;
+__thread mod_export volatile int retflag;
 
 /**/
-long lastval2;
+__thread long lastval2;
 
 /* The table of file descriptors.  A table element is zero if the  *
  * corresponding fd is not used by the shell.  It is greater than  *
@@ -176,53 +177,53 @@ long lastval2;
  * by zclose.                                                      */
 
 /**/
-mod_export unsigned char *fdtable;
+__thread mod_export unsigned char *fdtable;
 
 /* The allocated size of fdtable */
 
 /**/
-int fdtable_size;
+__thread int fdtable_size;
 
 /* The highest fd that marked with nonzero in fdtable */
 
 /**/
-mod_export int max_zsh_fd;
+__thread mod_export int max_zsh_fd;
 
 /* input fd from the coprocess */
 
 /**/
-mod_export int coprocin;
+__thread mod_export int coprocin;
 
 /* output fd from the coprocess */
 
 /**/
-mod_export int coprocout;
+__thread mod_export int coprocout;
 
 /* count of file locks recorded in fdtable */
 
 /**/
-int fdtable_flocks;
+__thread int fdtable_flocks;
 
 
 /* != 0 if the line editor is active */
 
 /**/
-mod_export int zleactive;
+__thread mod_export int zleactive;
 
 /* pid of process undergoing 'process substitution' */
 
 /**/
-pid_t cmdoutpid;
+__thread pid_t cmdoutpid;
 
 /* pid of last process started by <(...),  >(...) */
 
 /**/
-mod_export pid_t procsubstpid;
+__thread mod_export pid_t procsubstpid;
 
 /* exit status of process undergoing 'process substitution' */
 
 /**/
-int cmdoutval;
+__thread int cmdoutval;
 
 /*
  * This is set by an exiting $(...) substitution to indicate we need
@@ -231,23 +232,23 @@ int cmdoutval;
  */
 
 /**/
-int use_cmdoutval;
+__thread int use_cmdoutval;
 
 /* The context in which a shell function is called, see SFC_* in zsh.h. */
 
 /**/
-mod_export int sfcontext;
+__thread mod_export int sfcontext;
 
 /* Stack to save some variables before executing a signal handler function */
 
 /**/
-struct execstack *exstack;
+__thread struct execstack *exstack;
 
 /* Stack with names of function calls, 'source' calls, and 'eval' calls
  * currently active. */
 
 /**/
-mod_export Funcstack funcstack;
+__thread mod_export Funcstack funcstack;
 
 #define execerr()				\
     do {					\
@@ -259,14 +260,14 @@ mod_export Funcstack funcstack;
 	}					\
     } while (0)
 
-static int doneps4;
-static char *STTYval;
-static char *blank_env[] = { NULL };
+static __thread int doneps4;
+static __thread char *STTYval;
+static __thread char *blank_env[] = { NULL };
 
 /* total allocated elements in zsh_eval_context array */
-static int zsh_eval_context_len;
+static __thread int zsh_eval_context_len;
 /* number of in-use elements in zsh_eval_context array */
-static int zsh_eval_context_alen;
+static __thread int zsh_eval_context_alen;
 
 /* Execution functions. */
 
@@ -278,7 +279,7 @@ static int (*execfuncs[WC_COUNT-WC_CURSH]) (Estate, int) = {
 };
 
 /* structure for command builtin for when it is used with -v or -V */
-static struct builtin commandbn =
+static __thread struct builtin commandbn =
     BUILTIN("command", 0, bin_whence, 0, -1, BIN_COMMAND, "pvV", NULL);
 
 /* parse string into a list */
@@ -312,7 +313,7 @@ parse_string(char *s, int reset_lineno)
 /* the resource limits for the shell and its children */
 
 /**/
-mod_export struct rlimit current_limits[RLIM_NLIMITS], limits[RLIM_NLIMITS];
+__thread mod_export struct rlimit current_limits[RLIM_NLIMITS], limits[RLIM_NLIMITS];
 
 /**/
 mod_export int
@@ -459,13 +460,13 @@ zfork(struct timespec *ts)
  */
 
 /**/
-int list_pipe = 0, simple_pline = 0;
+__thread int list_pipe = 0, simple_pline = 0;
 
-static pid_t list_pipe_pid;
-static struct timespec list_pipe_start;
-static int nowait, pline_level = 0;
-static int list_pipe_child = 0, list_pipe_job;
-static char list_pipe_text[JOBTEXTSIZE];
+static __thread pid_t list_pipe_pid;
+static __thread struct timespec list_pipe_start;
+static __thread int nowait, pline_level = 0;
+static __thread int list_pipe_child = 0, list_pipe_job;
+static __thread char list_pipe_text[JOBTEXTSIZE];
 
 /* execute a current shell command */
 
@@ -509,7 +510,7 @@ static int
 zexecve(char *pth, char **argv, char **newenvp)
 {
     int eno;
-    static char buf[PATH_MAX * 2+2+1+1]; /* enough room if pwd fits in PATH_MAX */
+    static __thread char buf[PATH_MAX * 2+2+1+1]; /* enough room if pwd fits in PATH_MAX */
     char **eep;
 
     unmetafy(pth, NULL);
@@ -1091,7 +1092,7 @@ hashcmd(char *arg0, char **pp)
 
 /**/
 int
-forklevel;
+__thread forklevel;
 
 /* Arguments to entersubsh() */
 enum {
@@ -1403,7 +1404,7 @@ execsimple(Estate state)
 void
 execlist(Estate state, int dont_change_job, int exiting)
 {
-    static int donetrap;
+    static __thread int donetrap;
     Wordcode next;
     wordcode code;
     int ret, cj, csp, ltype;
@@ -1730,7 +1731,7 @@ execpline(Estate state, wordcode slcode, int how, int last1)
     int old_simple_pline = simple_pline;
     int slflags = WC_SUBLIST_FLAGS(slcode);
     wordcode code = *state->pc++;
-    static int lastwj, lpforked;
+    static __thread int lastwj, lpforked;
 
     if (wc_code(code) != WC_PIPE && !(how & Z_TIMED))
 	return lastval = (slflags & WC_SUBLIST_NOT) != 0;
@@ -2344,11 +2345,28 @@ closemn(struct multio **mfds, int fd, int type)
 	 * is set up to handle it.
 	 */
 	child_block();
+	/* AOK: NOT converted to a re-launch, and this is the one site where
+	 * that is a considered decision rather than a limitation of the design.
+	 *
+	 * This child is not a shell at all -- it is a byte pump between one
+	 * descriptor and several, with no shell state of any kind. Handing it
+	 * to a whole re-launched zsh would be absurd, and it cannot be a host
+	 * thread either, because the parent must CLOSE these descriptors and a
+	 * thread shares them. The right answer is a tiny native helper spawned
+	 * with file actions, which is a piece of work of its own.
+	 *
+	 * So MULTIOS with two or more redirections on one descriptor --
+	 * `echo x > a > b`, `cat < a < b` -- still fails, with zfork's message
+	 * plus the one below naming the construct. Everything else about
+	 * redirection works. */
 	if ((pid = zfork(&bgtime))) {
 	    for (i = 0; i < mn->ct; i++)
 		zclose(mn->fds[i]);
 	    zclose(mn->pipe);
 	    if (pid == -1) {
+		zerr("multios (two or more redirections on one descriptor) "
+		     "are not implemented in native zsh; "
+		     "use `unsetopt multios' or redirect once");
 		mfds[fd] = NULL;
 		child_unblock();
 		return;
@@ -2736,7 +2754,7 @@ setunderscore(char *str)
  * used in execsubst() which might be called from one of the functions
  * called from execcmd() (like execfor() and so on). */
 
-static int esprefork, esglob = 1;
+static __thread int esprefork, esglob = 1;
 
 /**/
 void
@@ -2861,91 +2879,154 @@ static void execcmd_getargs(LinkList preargs, LinkList args, int expand)
     }
 }
 
+/* AOK: initialise a spawn description that joins an existing process group. */
+static void sp_pgid_join(struct aok_spawn *sp, pid_t pgid)
+{
+    aok_spawn_init(sp);
+    sp->pgid = (int) pgid;
+}
+
 /**/
 static int
 execcmd_fork(Estate state, int how, int type, Wordcode varspc,
-	     LinkList *filelistp, char *text, int oautocont,
-	     int close_if_forked)
+	     LinkList *filelistp, char *text, char *aoktext, int input,
+	     int output, int oautocont, int close_if_forked)
 {
     pid_t pid;
-    int synch[2], flags;
     struct entersubsh_ret esret;
     struct timespec bgtime;
+    struct aok_spawn sp;
+    int flags, newleader = 0;
 
     child_block();
     esret.gleader = -1;
     esret.list_pipe_job = -1;
+    zgettime_monotonic_if_available(&bgtime);
 
-    if (pipe(synch) < 0) {
-	zerr("pipe failed: %e", errno);
-	return -1;
-    } else if ((pid = zfork(&bgtime)) == -1) {
-	close(synch[0]);
-	close(synch[1]);
-	lastval = 1;
-	errflag |= ERRFLAG_ERROR;
-	return -1;
-    }
-    if (pid) {
-	close(synch[1]);
-	read_loop(synch[0], (char *)&esret, sizeof(esret));
-	close(synch[0]);
-	if (how & Z_ASYNC) {
-	    lastpid = (zlong) pid;
-	} else if (!jobtab[thisjob].stty_in_env && varspc) {
-	    /* search for STTY=... */
-	    Wordcode p = varspc;
-	    wordcode ac;
-
-	    while (wc_code(ac = *p) == WC_ASSIGN) {
-		if (!strcmp(ecrawstr(state->prog, p + 1, NULL), "STTY")) {
-		    jobtab[thisjob].stty_in_env = 1;
-		    break;
-		}
-		p += (WC_ASSIGN_TYPE(ac) == WC_ASSIGN_SCALAR ?
-		      3 : WC_ASSIGN_NUM(ac) + 2);
-	    }
-	}
-	addproc(pid, text, 0, &bgtime, esret.gleader, esret.list_pipe_job);
-	if (oautocont >= 0)
-	    opts[AUTOCONTINUE] = oautocont;
-	pipecleanfilelist(jobtab[thisjob].filelist, 1);
-	return pid;
-    }
-
-    /* pid == 0 */
-    close(synch[0]);
     flags = ((how & Z_ASYNC) ? ESUB_ASYNC : 0) | ESUB_PGRP;
     if ((type != WC_SUBSH) && !(how & Z_ASYNC))
 	flags |= ESUB_KEEPTRAP;
-    if (type == WC_SUBSH && !(how & Z_ASYNC))
-	flags |= ESUB_JOB_CONTROL;
-    *filelistp = jobtab[thisjob].filelist;
-    entersubsh(flags, &esret);
-    if (write_loop(synch[1], (const void *) &esret, sizeof(esret)) != sizeof(esret)) {
-	zerr("Failed to send entersubsh_ret report: %e", errno);
+
+    /* AOK: the synch[] pipe is gone with the fork it existed for.
+     *
+     * Upstream, the parent blocks in read_loop() on a pipe until the child
+     * writes back a `struct entersubsh_ret` -- because entersubsh() computes
+     * the process group INSIDE the child. A spawned child has no such moment,
+     * and worse, it would inherit the write end and the parent's read would
+     * only return when the child EXITED, which turns `cmd &` into a
+     * synchronous run that merely looks like backgrounding is broken.
+     *
+     * So entersubsh's pgrp block is done HERE instead, from the parent, and
+     * described to the spawn with posix_spawnattr_setpgroup -- which the shim
+     * applies while impersonating the child, before it execs. It has to be
+     * before: sys_setpgid refuses with EACCES once a task has exec'd, so the
+     * parent genuinely cannot fix this up afterwards.
+     *
+     * The one thing that must still happen after the spawn is claiming the
+     * terminal for a new group, because only then is the pid known. */
+    if (isset(MONITOR) && thisjob != -1) {
+	if (jobtab[list_pipe_job].gleader && (list_pipe || list_pipe_child)) {
+	    sp_pgid_join(&sp, jobtab[list_pipe_job].gleader);
+	    if (!(how & Z_ASYNC)) {
+		esret.gleader = jobtab[list_pipe_job].gleader;
+		esret.list_pipe_job = list_pipe_job;
+	    }
+	} else if (jobtab[thisjob].gleader) {
+	    sp_pgid_join(&sp, jobtab[thisjob].gleader);
+	} else {
+	    /* "This is the standard point at which a newly started process
+	     * gets put into the foreground by taking over the terminal" --
+	     * upstream's comment, one level up. The child leads a new group
+	     * whose id is its own pid, which is only knowable after the
+	     * spawn. */
+	    aok_spawn_init(&sp);
+	    sp.pgid = 0;
+	    newleader = 1;
+	}
+    } else {
+	aok_spawn_init(&sp);
+    }
+
+    /* do_piping's work, which the forked child would have done for itself
+     * further down execcmd_exec (addfd/mfds). There is no child to do it in, so
+     * it is described to the spawn -- and both ends have to be closed after the
+     * dup2 for the reason bash's port records: a pipeline whose writer still
+     * holds the read end never ends, and `yes | head -1` hangs rather than
+     * merely leaking. */
+    if (input)
+	sp.in_fd = input;
+    if (output)
+	sp.out_fd = output;
+    sp.flags = (flags & ESUB_KEEPTRAP) ? AOK_SUB_KEEPTRAP : 0;
+    if (how & Z_ASYNC)
+	sp.flags |= AOK_SUB_ASYNC;
+    /* ZSH_SUBSHELL is counted by entersubsh, i.e. by the CHILD, so the spawn
+     * normally has to supply the entry the missing fork would have made. Not
+     * here when the construct is a subshell: what this site hands over is the
+     * `( ... )` itself, and the child counts it while re-parsing -- which is
+     * also what real zsh does, since a forked pipeline element running a
+     * subshell does not enter twice (`( print $ZSH_SUBSHELL ) | cat` prints 1,
+     * where `{ ( print $ZSH_SUBSHELL ) } | cat` prints 2). */
+    if (type == WC_SUBSH)
+	sp.subsh_counted = 1;
+    /* entersubsh: a background job with no job control gets SIGINT and SIGQUIT
+     * ignored and its stdin replaced, so that ^C at the prompt does not reach
+     * it and it does not compete for the terminal. */
+    if (!isset(MONITOR) && (how & Z_ASYNC))
+	sp.stdin_null = isatty(0);
+    aok_spawn_close(&sp, close_if_forked);
+
+    pid = aok_spawn_subshell(aoktext, &sp);
+    if (pid == -1) {
+	zerr("subshell failed: %e", errno);
+	lastval = 1;
+	errflag |= ERRFLAG_ERROR;
+	child_unblock();
 	return -1;
     }
-    close(synch[1]);
-    zclose(close_if_forked);
 
-    if (sigtrapped[SIGINT] & ZSIG_IGNORED)
-	holdintr();
-    /*
-     * EXIT traps shouldn't be called even if we forked to run
-     * shell code as this isn't the main shell.
-     */
-    sigtrapped[SIGEXIT] = 0;
-#ifdef HAVE_NICE
-    /* Check if we should run background jobs at a lower priority. */
-    if ((how & Z_ASYNC) && isset(BGNICE)) {
-	errno = 0;
-	if (nice(5) == -1 && errno)
-	    zwarn("nice(5) failed: %e", errno);
+    if (newleader) {
+	jobtab[thisjob].gleader = pid;
+	if (list_pipe_job != thisjob && !jobtab[list_pipe_job].gleader)
+	    jobtab[list_pipe_job].gleader = jobtab[thisjob].gleader;
+	if (!(how & Z_ASYNC)) {
+	    /* Upstream does this from inside the child, relying on SIGTTOU
+	     * being ignored there. Here it is the parent's own tty and the
+	     * parent is already the foreground group, so it simply hands it
+	     * over. */
+	    attachtty(jobtab[thisjob].gleader);
+	    esret.gleader = jobtab[thisjob].gleader;
+	    if (list_pipe_job != thisjob)
+		esret.list_pipe_job = list_pipe_job;
+	}
     }
-#endif /* HAVE_NICE */
 
-    return 0;
+    if (how & Z_ASYNC) {
+	lastpid = (zlong) pid;
+    } else if (!jobtab[thisjob].stty_in_env && varspc) {
+	/* search for STTY=... */
+	Wordcode p = varspc;
+	wordcode ac;
+
+	while (wc_code(ac = *p) == WC_ASSIGN) {
+	    if (!strcmp(ecrawstr(state->prog, p + 1, NULL), "STTY")) {
+		jobtab[thisjob].stty_in_env = 1;
+		break;
+	    }
+	    p += (WC_ASSIGN_TYPE(ac) == WC_ASSIGN_SCALAR ?
+		  3 : WC_ASSIGN_NUM(ac) + 2);
+	}
+    }
+    addproc(pid, text, 0, &bgtime, esret.gleader, esret.list_pipe_job);
+    if (oautocont >= 0)
+	opts[AUTOCONTINUE] = oautocont;
+    pipecleanfilelist(jobtab[thisjob].filelist, 1);
+    (void) filelistp;
+    /* HAVE_NICE: upstream lowers a background job's priority from inside the
+     * child. There is no child here to do it in, and calling nice() from this
+     * side would renice the SHELL -- and, since a native program is a thread of
+     * the app, arguably the app. Left out rather than done wrongly. */
+    return pid;
 }
 
 /*
@@ -2958,6 +3039,7 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	     int input, int output, int how, int last1, int close_if_forked)
 {
     HashNode hn = NULL;
+    char *aoktext = NULL;
     LinkList filelist = NULL;
     LinkNode node;
     Redir fn;
@@ -3053,8 +3135,22 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	 * a bit further before we make the decision.
 	 */
 	text = getjobtext(state->prog, eparams->beg);
+	/* AOK: the job table's text and the RE-LAUNCH's text are not the same
+	 * string, and using getjobtext for both would be a silent bug.
+	 * JOBTEXTSIZE is 80 (zsh.h) and getjobtext renders into a static buffer
+	 * with display formatting, so anything longer would be handed to the
+	 * child as a fragment that might still parse. getpermtext is the
+	 * untruncated, heap-allocated form -- what `functions` prints a body
+	 * with -- and eparams->beg covers the command WITH its assignments and
+	 * redirections, which is exactly what a fresh shell has to be given.
+	 *
+	 * Nothing has been expanded at this point in execcmd_exec, so re-running
+	 * the text here is faithful rather than approximate. That is not true at
+	 * the second call site; see the note there. */
+	aoktext = getpermtext(state->prog, eparams->beg, 0);
 	switch (execcmd_fork(state, how, type, varspc, &filelist,
-			     text, oautocont, close_if_forked)) {
+			     text, aoktext, input, output, oautocont,
+			     close_if_forked)) {
 	case -1:
 	    goto fatal;
 	case 0:
@@ -3718,10 +3814,46 @@ execcmd_exec(Estate state, Execcmd_params eparams,
     if (!forked) {
 	if (!do_exec &&
 	    (((is_builtin || is_shfunc) && output) ||
-	     (!is_cursh && (last1 != 1 || nsigtrapped || havefiles() ||
-			    fdtable_flocks)))) {
+	     /* AOK: nsigtrapped MINUS the traps this shell was handed. A
+	      * re-launched child is already somebody's fork, and counting the
+	      * traps it inherited made it fork again for the same reason,
+	      * forever. See aok_inherited_ntraps. */
+	     (!is_cursh && (last1 != 1 ||
+			    nsigtrapped > aok_inherited_ntraps ||
+			    havefiles() || fdtable_flocks)))) {
+	    /* AOK: DOUBLE EVALUATION lives here, and this is the mitigation.
+	     *
+	     * By this point prefork() has already run over the argument list in
+	     * THIS shell, so anything with a side effect -- $(...), `...`,
+	     * $((i++)), ${x::=...} -- has happened once. Handing the child the
+	     * original source text would make it happen again. A fork does not
+	     * have this problem: its child carries on with the words already
+	     * expanded.
+	     *
+	     * So for a plain external command with no assignments and no
+	     * redirections, the child is given the EXPANDED words, quoted --
+	     * which re-runs nothing. `cmd $(date); more` is that shape and it is
+	     * the common one.
+	     *
+	     * The fallback to source text remains for the rest: `VAR=x cmd $(y)`
+	     * needs its assignments, `cmd $(y) >f` needs its redirection, and a
+	     * `( ... )` subshell in non-tail position is shell code whose body
+	     * has not been expanded at all and so is faithful either way. The
+	     * narrow case still exposed is a side-effecting expansion in a
+	     * command that ALSO carries an assignment or a redirection and is
+	     * not the last thing this shell will do. It is written down here
+	     * rather than left to be discovered. */
+	    if ((type == WC_SIMPLE || type == WC_TYPESET) &&
+		args && nonempty(args) && !varspc &&
+		(!eparams->redir || empty(eparams->redir)))
+		aoktext = aok_quote_words(args);
+	    else
+		aoktext = getpermtext(state->prog, eparams->beg, 0);
+	    if (!text)
+		text = getjobtext(state->prog, eparams->beg);
 	    switch (execcmd_fork(state, how, type, varspc, &filelist,
-				 text, oautocont, close_if_forked)) {
+				 text, aoktext, input, output, oautocont,
+				 close_if_forked)) {
 	    case -1:
 		goto fatal;
 	    case 0:
@@ -4821,37 +4953,70 @@ getoutput(char *cmd, int qt)
     }
     child_block();
     cmdoutval = 0;
-    if ((cmdoutpid = pid = zfork(NULL)) == -1) {
-	/* fork error */
+    /* AOK: the first of the re-launch sites, and the one worth doing first --
+     * command substitution is the most used, the most clearly one-way, and the
+     * only site handed the substitution's own SOURCE TEXT rather than a parse
+     * tree to reconstruct it from.
+     *
+     * The seam is narrow because zsh's parent side already does the right
+     * things: it owns the pipe and reads it itself, and `cmdoutpid = pid` is
+     * what signals.c's SIGCHLD reaper matches on to stash the child's status in
+     * cmdoutval. Both survive untouched -- only the fork is replaced.
+     *
+     * The child stays in this shell's process group (ESUB_PGRP with no job
+     * control here means "do not start a new one"), so no spawn attribute is
+     * needed for it. */
+    {
+	struct aok_spawn sp;
+
+	aok_spawn_init(&sp);
+	sp.out_fd = pipes[1];
+	/* The read end must not survive into the child. A child holding it
+	 * open is a reader that never goes away, so this shell's readoutput
+	 * would wait for an EOF that cannot arrive. */
+	aok_spawn_close(&sp, pipes[0]);
+	pid = aok_spawn_subshell(cmd, &sp);
+    }
+    if ((cmdoutpid = pid) == -1) {
+	zerr("subshell failed: %e", errno);
 	zclose(pipes[0]);
 	zclose(pipes[1]);
 	errflag |= ERRFLAG_ERROR;
 	cmdoutpid = 0;
 	child_unblock();
 	return NULL;
-    } else if (pid) {
+    } else {
 	LinkList retval;
 
 	zclose(pipes[1]);
 	retval = readoutput(pipes[0], qt, NULL);
 	fdtable[pipes[0]] = FDT_UNUSED;
-	waitforpid(pid, 0);		/* unblocks */
+	/* AOK: reaped here rather than through waitforpid().
+	 *
+	 * waitforpid() spins in signal_suspend() until kill(pid, 0) fails,
+	 * which for a zombie it does not -- it needs the SIGCHLD handler to
+	 * have reaped the child first. That is one more moving part than this
+	 * site needs: the output has already been read to EOF, so the child is
+	 * finished, and a blocking waitpid is both shorter and immune to
+	 * whether SIGCHLD arrived while it was blocked.
+	 *
+	 * The reaper may still have got there first, in which case cmdoutval
+	 * is already right and waitpid answers ECHILD -- so the status is only
+	 * taken when this call is the one that collected it. cmdoutpid is
+	 * cleared either way, or signals.c would later attribute an unrelated
+	 * child's status to this substitution. */
+	{
+	    int status = 0;
+
+	    if (waitpid(pid, &status, 0) == pid)
+		cmdoutval = WIFSIGNALED(status)
+		    ? (0200 | WTERMSIG(status)) : WEXITSTATUS(status);
+	    cmdoutpid = 0;
+	}
+	child_unblock();
 	lastval = cmdoutval;
 	return retval;
     }
-    /* pid == 0 */
-    child_unblock();
-    zclose(pipes[0]);
-    redup(pipes[1], 1);
-    entersubsh(ESUB_PGRP|ESUB_NOMONITOR, NULL);
-    cmdpush(CS_CMDSUBST);
-    execode(prog, 0, 1, "cmdsubst");
-    cmdpop();
-    close(1);
-    _realexit();
-    zerr("exit returned in child!!");
-    kill(getpid(), SIGKILL);
-    return NULL;
 }
 
 /* read output of command substitution
@@ -5032,30 +5197,33 @@ getoutputfile(char *cmd, char **eptr)
 	return nam;
     }
 
-    if ((cmdoutpid = pid = zfork(NULL)) == -1) {
-	/* fork error */
+    /* AOK: `=(...)` is command substitution with the output landing in a file
+     * instead of a pipe, so it is the same re-launch with a different
+     * descriptor. Converted in the same pass as $(...) deliberately: its
+     * failure mode is the nastiest of the eight sites -- on a failed fork
+     * upstream returns the name of a VALID, EMPTY file, so the construct
+     * produced silently wrong data rather than an error a script could see. */
+    {
+	struct aok_spawn sp;
+	int status = 0;
+
+	aok_spawn_init(&sp);
+	sp.out_fd = fd;
+	pid = aok_spawn_subshell(getpermtext(prog, NULL, 0), &sp);
+	if (pid == -1) {
+	    zerr("process substitution failed: %e", errno);
+	    close(fd);
+	    child_unblock();
+	    errflag |= ERRFLAG_ERROR;
+	    return nam;
+	}
 	close(fd);
+	if (waitpid(pid, &status, 0) != pid)
+	    status = 0;
 	child_unblock();
-	return nam;
-    } else if (pid) {
-	close(fd);
-	waitforpid(pid, 0);
 	cmdoutval = 0;
 	return nam;
     }
-
-    /* pid == 0 */
-    closem(FDT_UNUSED, 0);
-    redup(fd, 1);
-    entersubsh(ESUB_PGRP|ESUB_NOMONITOR, NULL);
-    cmdpush(CS_CMDSUBST);
-    execode(prog, 0, 1, "equalsubst");
-    cmdpop();
-    close(1);
-    _realexit();
-    zerr("exit returned in child!!");
-    kill(getpid(), SIGKILL);
-    return NULL;
 }
 
 #if !defined(PATH_DEV_FD) && defined(HAVE_FIFOS)
@@ -5138,7 +5306,31 @@ getproc(char *cmd, char **eptr)
 	return NULL;
     if (mpipe(pipes) < 0)
 	return NULL;
-    if ((pid = zfork(&bgtime))) {
+    /* AOK: `<(...)` and `>(...)`. One-way in its STATE like every other
+     * subshell, but long-lived in its lifetime: it runs alongside this shell
+     * and is not waited for here, and the other end of its pipe stays open in
+     * this shell's fdtable as /dev/fd/N. So the parent-side bookkeeping below
+     * -- FDT_PROC_SUBST, addfilelist, procsubstpid, and addproc for the
+     * reading direction -- is left exactly as the fork version had it; only
+     * the fork is replaced. */
+    {
+	struct aok_spawn sp;
+
+	zgettime_monotonic_if_available(&bgtime);
+	aok_spawn_init(&sp);
+	if (out)
+	    sp.out_fd = pipes[out];
+	else
+	    sp.in_fd = pipes[out];
+	sp.flags = AOK_SUB_ASYNC;
+	/* closem() is what the forked child used to do this with, and its
+	 * comment says so: "this closes pipes[!out] as well". The end this
+	 * shell keeps must not stay open in the child, or the reader at the
+	 * far end of /dev/fd/N never sees EOF. */
+	aok_spawn_close(&sp, pipes[!out]);
+	pid = aok_spawn_subshell(getpermtext(prog, NULL, 0), &sp);
+    }
+    {
 	sprintf(pnam, "%s/%d", PATH_DEV_FD, pipes[!out]);
 	zclose(pipes[out]);
 	if (pid == -1)
@@ -5156,9 +5348,6 @@ getproc(char *cmd, char **eptr)
 	procsubstpid = pid;
 	return pnam;
     }
-    entersubsh(ESUB_ASYNC|ESUB_PGRP, NULL);
-    redup(pipes[out], out);
-    closem(FDT_UNUSED, 0);   /* this closes pipes[!out] as well */
 #endif /* PATH_DEV_FD */
 
     cmdpush(CS_CMDSUBST);
@@ -5196,7 +5385,25 @@ getpipe(char *cmd, int nullexec)
     }
     if (mpipe(pipes) < 0)
 	return -1;
-    if ((pid = zfork(&bgtime))) {
+    /* AOK: `< <(...)` and `> >(...)` in redirection position -- getproc's twin,
+     * differing only in returning a descriptor rather than a /dev/fd path and
+     * in the nullexec case (`exec < <(...)`), where the fd outlives the
+     * command and so must not be added to the job. Converted together with it
+     * because they differ by three lines. */
+    {
+	struct aok_spawn sp;
+
+	zgettime_monotonic_if_available(&bgtime);
+	aok_spawn_init(&sp);
+	if (out)
+	    sp.out_fd = pipes[out];
+	else
+	    sp.in_fd = pipes[out];
+	sp.flags = AOK_SUB_ASYNC;
+	aok_spawn_close(&sp, pipes[!out]);
+	pid = aok_spawn_subshell(getpermtext(prog, NULL, 0), &sp);
+    }
+    {
 	zclose(pipes[out]);
 	if (pid == -1) {
 	    zclose(pipes[!out]);
@@ -5207,14 +5414,6 @@ getpipe(char *cmd, int nullexec)
 	procsubstpid = pid;
 	return pipes[!out];
     }
-    entersubsh(ESUB_ASYNC|ESUB_PGRP|ESUB_NOMONITOR, NULL);
-    redup(pipes[out], out);
-    closem(FDT_UNUSED, 0);	/* this closes pipes[!out] as well */
-    cmdpush(CS_CMDSUBST);
-    execode(prog, 0, 1, out ? "outsubst" : "insubst");
-    cmdpop();
-    _realexit();
-    return 0;
 }
 
 /* open pipes with fds >= 10 */
@@ -5895,8 +6094,8 @@ doshfunc(Shfunc shfunc, LinkList doshargs, int noreturnval)
     int flags = shfunc->node.flags;
     char *fname = dupstring(name);
     Eprog prog, marked_prog;
-    static int oflags;
-    static int funcdepth;
+    static __thread int oflags;
+    static __thread int funcdepth;
     Heap funcheap;
 
     queue_signals();	/* Lots of memory and global state changes coming */

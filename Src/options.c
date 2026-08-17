@@ -33,22 +33,22 @@
 /* current emulation (used to decide which set of option letters is used) */
 
 /**/
-mod_export int emulation;
+__thread mod_export int emulation;
  
 /* current sticky emulation:  sticky = NULL means none */
 
 /**/
-mod_export Emulation_options sticky;
+__thread mod_export Emulation_options sticky;
 
 /* the options; e.g. if opts[SHGLOB] != 0, SH_GLOB is turned on */
 
 /**/
-mod_export char opts[OPT_SIZE];
+__thread mod_export char opts[OPT_SIZE];
 
 /* Option name hash table */
 
 /**/
-mod_export HashTable optiontab;
+__thread mod_export HashTable optiontab;
 
 /* The canonical option name table */
 
@@ -76,7 +76,7 @@ mod_export HashTable optiontab;
  * Note that option names should usually be fewer than 20 characters long
  * to avoid formatting problems.
  */
-static struct optname optns[] = {
+static __thread struct optname optns[] = {
 {{NULL, "aliases",	      OPT_EMULATE|OPT_ALL},	 ALIASESOPT},
 {{NULL, "aliasfuncdef",       OPT_EMULATE|OPT_BOURNE},	 ALIASFUNCDEF},
 {{NULL, "allexport",	      OPT_EMULATE},		 ALLEXPORT},
@@ -289,7 +289,7 @@ static struct optname optns[] = {
 #define FIRST_OPT '0'
 #define LAST_OPT 'y'
 
-static short zshletters[LAST_OPT - FIRST_OPT + 1] = {
+static __thread short zshletters[LAST_OPT - FIRST_OPT + 1] = {
     /* 0 */  CORRECT,
     /* 1 */  PRINTEXITVALUE,
     /* 2 */ -BADPATTERN,
@@ -366,7 +366,7 @@ static short zshletters[LAST_OPT - FIRST_OPT + 1] = {
     /* y */  SHWORDSPLIT,
 };
 
-static short kshletters[LAST_OPT - FIRST_OPT + 1] = {
+static __thread short kshletters[LAST_OPT - FIRST_OPT + 1] = {
     /* 0 */  0,
     /* 1 */  0,
     /* 2 */  0,
@@ -493,12 +493,12 @@ createoptiontable(void)
 
 /* Emulation appropriate to the setemulate function */
 
-static int setemulate_emulation;
+static __thread int setemulate_emulation;
 
 /* Option array manipulated within the setemulate function */
 
 /**/
-static char *setemulate_opts;
+static __thread char *setemulate_opts;
 
 /* Setting of default options */
 
@@ -891,7 +891,7 @@ dosetopt(int optno, int value, int force, char *new_opts)
 char *
 dashgetfn(UNUSED(Param pm))
 {
-    static char buf[LAST_OPT - FIRST_OPT + 2];
+    static __thread char buf[LAST_OPT - FIRST_OPT + 2];
     char *val = buf;
     int i;
 
@@ -979,7 +979,7 @@ printoptionlist_printequiv(int optno)
 }
 
 /**/
-static char *print_emulate_opts;
+static __thread char *print_emulate_opts;
 
 /**/
 static void

@@ -2,12 +2,12 @@
 #ifndef have_Src_Zle_zle_keymap_globals
 #define have_Src_Zle_zle_keymap_globals
 
-extern Keymap curkeymap;
-extern Keymap localkeymap;
-extern mod_import_variable char*curkeymapname;
-extern mod_import_variable HashTable keymapnamtab;
-extern char*keybuf;
-extern int keybuflen;
+__thread extern Keymap curkeymap;
+__thread extern Keymap localkeymap;
+__thread extern mod_import_variable char*curkeymapname;
+__thread extern mod_import_variable HashTable keymapnamtab;
+__thread extern char*keybuf;
+__thread extern int keybuflen;
 extern mod_import_function Keymap newkeymap(Keymap tocopy,char*kmname);
 extern void deletekeymap(Keymap km);
 extern void scankeymap(Keymap km,int sort,KeyScanFunc func,void*magic);

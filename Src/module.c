@@ -36,17 +36,17 @@
  */
 
 /**/
-LinkList linkedmodules;
+__thread LinkList linkedmodules;
 
 /* $module_path ($MODULE_PATH) */
 
 /**/
-char **module_path;
+__thread char **module_path;
 
 /* Hash of modules */
 
 /**/
-mod_export HashTable modulestab;
+__thread mod_export HashTable modulestab;
 
 /*
  * Bit flags passed as the "flags" argument of a autofeaturefn_t.
@@ -566,7 +566,7 @@ addbuiltins(char const *nam, Builtin binl, int size)
 /* The list of function wrappers defined. */
 
 /**/
-FuncWrap wrappers;
+__thread FuncWrap wrappers;
 
 /* This adds a definition for a wrapper. Return value is one in case of *
  * error and zero if all went fine. */
@@ -636,7 +636,7 @@ deletewrapper(Module m, FuncWrap w)
 /* The list of module-defined conditions. */
 
 /**/
-mod_export Conddef condtab;
+__thread mod_export Conddef condtab;
 
 /* This gets a condition definition with the given name. The first        *
  * argument says if we have to look for an infix condition. The last      *
@@ -839,7 +839,7 @@ del_autocond(UNUSED(const char *modnam), const char *cnam, int flags)
 /* This list of hook functions defined. */
 
 /**/
-Hookdef hooktab;
+__thread Hookdef hooktab;
 
 /* Find a hook definition given the name. */
 
@@ -1259,7 +1259,7 @@ del_autoparam(UNUSED(const char *modnam), const char *pnam, int flags)
 /* List of math functions. */
 
 /**/
-MathFunc mathfuncs;
+__thread MathFunc mathfuncs;
 
 /*
  * Remove a single math function form the list (utility function).

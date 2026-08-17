@@ -63,29 +63,29 @@
  * zlemetacs and zlemetall are defined in lex.c.
  */
 /**/
-mod_export char *zlemetaline;
+__thread mod_export char *zlemetaline;
 /**/
-mod_export int metalinesz;
+__thread mod_export int metalinesz;
 
 /* The line before completion was tried. */
 
 /**/
-mod_export char *origline;
+__thread mod_export char *origline;
 /**/
-mod_export int origcs, origll;
+__thread mod_export int origcs, origll;
 
 /* Words on the command line, for use in completion */
  
 /**/
-mod_export int clwsize, clwnum, clwpos;
+__thread mod_export int clwsize, clwnum, clwpos;
 /**/
-mod_export char **clwords;
+__thread mod_export char **clwords;
 
 /* offs is the cursor position within the tokenized *
  * current word after removing nulargs.             */
 
 /**/
-mod_export int offs;
+__thread mod_export int offs;
 
 /* These control the type of completion that will be done.  They are       *
  * affected by the choice of ZLE command and by relevant shell options.    *
@@ -93,54 +93,54 @@ mod_export int offs;
  * insert a match as if for menucompletion but without really starting it. */
 
 /**/
-mod_export int usemenu, useglob;
+__thread mod_export int usemenu, useglob;
 
 /* != 0 if we would insert a TAB if we weren't calling a completion widget. */
 
 /**/
-mod_export int wouldinstab;
+__thread mod_export int wouldinstab;
 
 /* != 0 if we are in the middle of a menu completion. */
 
 /**/
-mod_export int menucmp;
+__thread mod_export int menucmp;
 
 /* Lists of brace-infos before/after cursor (first and last for each). */
 
 /**/
-mod_export Brinfo brbeg, lastbrbeg, brend, lastbrend;
+__thread mod_export Brinfo brbeg, lastbrbeg, brend, lastbrend;
 
 /**/
-mod_export int nbrbeg, nbrend;
+__thread mod_export int nbrbeg, nbrend;
 
 /**/
-mod_export char *lastprebr, *lastpostbr;
+__thread mod_export char *lastprebr, *lastpostbr;
 
 /* !=0 if we have a valid completion list. */
 
 /**/
-mod_export int validlist;
+__thread mod_export int validlist;
 
 /* Non-zero if we have to redisplay the list of matches. */
 
 /**/
-mod_export int showagain = 0;
+__thread mod_export int showagain = 0;
 
 /* This holds the word we are working on without braces removed. */
 
-static char *origword;
+static __thread char *origword;
 
 /* The quoted prefix/suffix and a flag saying if we want to add the
  * closing quote. */
 
 /**/
-mod_export char *qipre, *qisuf, *autoq;
+__thread mod_export char *qipre, *qisuf, *autoq;
 
 /* This contains the name of the function to call if this is for a new  *
  * style completion. */
 
 /**/
-mod_export char *compfunc = NULL;
+__thread mod_export char *compfunc = NULL;
 
 /* Non-zero if the last completion done was ambiguous (used to find   *
  * out if AUTOMENU should start).  More precisely, it's nonzero after *
@@ -154,24 +154,24 @@ mod_export char *compfunc = NULL;
  * lastambig == 2.                                                    */
 
 /**/
-mod_export int lastambig, bashlistfirst;
+__thread mod_export int lastambig, bashlistfirst;
 
 /* Arguments for and return value of completion widget. */
 
 /**/
-mod_export char **cfargs;
+__thread mod_export char **cfargs;
 /**/
-mod_export int cfret;
+__thread mod_export int cfret;
 
 /* != 0 if recursive calls to completion are (temporarily) allowed */
 
 /**/
-mod_export int comprecursive;
+__thread mod_export int comprecursive;
 
 /* != 0 if there are any defined completion widgets. */
 
 /**/
-int hascompwidgets;
+__thread int hascompwidgets;
 
 /*
  * Find out if we have to insert a tab (instead of trying to complete).
@@ -363,30 +363,30 @@ acceptandmenucomplete(char **args)
  * position, in a redirection, or in a parameter expansion.   */
 
 /**/
-mod_export int lincmd, linredir, linarr;
+__thread mod_export int lincmd, linredir, linarr;
 
 /* The string for the redirection operator. */
 
 /**/
-mod_export char *rdstr;
+__thread mod_export char *rdstr;
 
-static char rdstrbuf[20];
+static __thread char rdstrbuf[20];
 
 /* The list of redirections on the line. */
 
 /**/
-mod_export LinkList rdstrs;
+__thread mod_export LinkList rdstrs;
 
 /* This holds the name of the current command (used to find the right *
  * compctl).                                                          */
 
 /**/
-mod_export char *cmdstr;
+__thread mod_export char *cmdstr;
 
 /* This hold the name of the variable we are working on. */
 
 /**/
-mod_export char *varname;
+__thread mod_export char *varname;
 
 /*
  * != 0 if we are in a subscript.
@@ -402,12 +402,12 @@ mod_export char *varname;
  */
 
 /**/
-mod_export int insubscr;
+__thread mod_export int insubscr;
 
 /* Parameter pointer for completing keys of an assoc array. */
 
 /**/
-mod_export Param keypm;
+__thread mod_export Param keypm;
 
 /*
  * instring takes one of the QT_* values defined in zsh.h.
@@ -416,7 +416,7 @@ mod_export Param keypm;
  */
 
 /**/
-mod_export int instring, inbackt;
+__thread mod_export int instring, inbackt;
 
 /*
  * Convenience macro for calling quotestring (formerly bslashquote() (formerly
@@ -598,7 +598,7 @@ parambeg(char *s)
 static int
 docomplete(int lst)
 {
-    static int active = 0;
+    static __thread int active = 0;
 
     char *s, *ol;
     int olst = lst, chl = 0, ne = noerrs, ocs, ret = 0, dat[2];
@@ -897,7 +897,7 @@ docomplete(int lst)
 }
 
 /* 1 if we are completing the prefix */
-static int comppref;
+static __thread int comppref;
 
 /* This function inserts an `x' in the command line at the cursor position. *
  *                                                                          *
@@ -2933,7 +2933,7 @@ expandhistory(UNUSED(char **args))
     return 0;
 }
 
-static int cmdwb, cmdwe;
+static __thread int cmdwb, cmdwe;
 
 /**/
 static char *

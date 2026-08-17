@@ -31,13 +31,13 @@
 #include "sort.pro"
 
 /* Flag for direction of sort: 1 forwards, -1 reverse */
-static int sortdir;
+static __thread int sortdir;
 
 /* Flag that sort ignores backslashes */
-static int sortnobslash;
+static __thread int sortnobslash;
 
 /* Flag that sort is numeric */
-static int sortnumeric;
+static __thread int sortnumeric;
 
 /**/
 static int

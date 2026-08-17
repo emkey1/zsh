@@ -33,22 +33,22 @@
 /* Global matcher. */
 
 /**/
-static Cmlist cmatcher;
+static __thread Cmlist cmatcher;
 
 /* Default completion infos */
  
 /**/
-struct compctl cc_compos, cc_default, cc_first, cc_dummy;
+__thread struct compctl cc_compos, cc_default, cc_first, cc_dummy;
  
 /* Hash table for completion info for commands */
  
 /**/
-HashTable compctltab;
+__thread HashTable compctltab;
 
 /* List of pattern compctls */
 
 /**/
-Patcomp patcomps;
+__thread Patcomp patcomps;
 
 #define COMP_LIST	(1<<0)	/* -L */
 #define COMP_COMMAND	(1<<1)	/* -C */
@@ -60,10 +60,10 @@ Patcomp patcomps;
 #define COMP_SPECIAL (COMP_COMMAND|COMP_DEFAULT|COMP_FIRST)
 
 /* Flag for listing, command, default, or first completion */
-static int cclist;
+static __thread int cclist;
 
 /* Mask for determining what to print */
-static unsigned long showmask = 0;
+static __thread unsigned long showmask = 0;
 
 /**/
 static void
@@ -1696,29 +1696,29 @@ bin_compcall(char *name, UNUSED(char **argv), Options ops, UNUSED(int func))
 
 /* A pointer to the compctl we are using. */
 
-static Compctl curcc;
+static __thread Compctl curcc;
 
 /* A list of all compctls we have already used. */
 
-static LinkList ccused, lastccused;
+static __thread LinkList ccused, lastccused;
 
 /* A stack of currently used compctls. */
 
-static LinkList ccstack;
+static __thread LinkList ccstack;
 
 /* The beginning and end of a word range to be used by -l. */
 
-static int brange, erange;
+static __thread int brange, erange;
 
 /* This is used to detect when and what to continue. */
 
-static unsigned long ccont;
+static __thread unsigned long ccont;
 
 /* Two patterns used when doing glob-completion.  The first one is built *
  * from the whole word we are completing and the second one from that    *
  * part of the word that was identified as a possible filename.          */
 
-static Patprog patcomp, filecomp;
+static __thread Patprog patcomp, filecomp;
 
 /* We store the following prefixes/suffixes:                               *
  * lpre/lsuf -- what's on the line                                         *
@@ -1732,22 +1732,22 @@ static Patprog patcomp, filecomp;
  * The integer variables hold the lengths of lpre, lsuf, rpre, rsuf,       *
  * fpre, fsuf, lppre, and lpsuf.  noreal is non-zero if we have rpre/rsuf. */
 
-static char *lpre, *lsuf;
-static char *rpre, *rsuf;
-static char *ppre, *psuf, *lppre, *lpsuf, *prpre;
-static char *fpre, *fsuf;
-static char *qfpre, *qfsuf, *qrpre, *qrsuf, *qlpre, *qlsuf;
-static int lpl, lsl, rpl, rsl, fpl, fsl, lppl, lpsl;
-static int noreal;
+static __thread char *lpre, *lsuf;
+static __thread char *rpre, *rsuf;
+static __thread char *ppre, *psuf, *lppre, *lpsuf, *prpre;
+static __thread char *fpre, *fsuf;
+static __thread char *qfpre, *qfsuf, *qrpre, *qrsuf, *qlpre, *qlsuf;
+static __thread int lpl, lsl, rpl, rsl, fpl, fsl, lppl, lpsl;
+static __thread int noreal;
 
 /* This is either zero or equal to the special character the word we are *
  * trying to complete starts with (e.g. Tilde or Equals).                */
 
-static char ic;
+static __thread char ic;
 
 /* This variable says what we are currently adding to the list of matches. */
 
-static int addwhat;
+static __thread int addwhat;
 
 /*
  * Convenience macro for calling quotestring (formerly bslashquote()
@@ -2305,7 +2305,7 @@ findnode(LinkList list, void *dat)
 /* A simple counter to avoid endless recursion between old and new style *
  * completion. */
 
-static int cdepth = 0;
+static __thread int cdepth = 0;
 
 #define MAX_CDEPTH 16
 
@@ -4003,18 +4003,30 @@ makecomplistflags(Compctl cc, char *s, int incmd, int compadd)
 }
 
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("compcall", 0, bin_compcall, 0, 0, 0, "TD", NULL),
     BUILTIN("compctl", 0, bin_compctl, 0, -1, 0, NULL, NULL),
 };
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
     bintab, sizeof(bintab)/sizeof(*bintab),
     NULL, 0,
     NULL, 0,
     NULL, 0,
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

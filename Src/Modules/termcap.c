@@ -42,7 +42,7 @@
 #ifdef HAVE_TGETENT
 
 #ifndef HAVE_BOOLCODES
-static char *boolcodes[] = {
+static __thread char *boolcodes[] = {
     "bw", "am", "ut", "cc", "xs", "YA", "YF", "YB", "xt", "xn", "eo",
     "gn", "hc", "HC", "km", "YC", "hs", "hl", "in", "YG", "da", "db",
     "mi", "ms", "nx", "xb", "NP", "ND", "NR", "os", "5i", "YD", "YE",
@@ -144,7 +144,7 @@ bin_echotc(char *name, char **argv, UNUSED(Options ops), UNUSED(int func))
     return 0;
 }
 
-static struct builtin bintab[] = {
+static __thread struct builtin bintab[] = {
     BUILTIN("echotc", 0, bin_echotc, 1, -1, 0, NULL, NULL),
 };
 
@@ -217,7 +217,7 @@ scantermcap(UNUSED(HashTable ht), ScanFunc func, int flags)
     char **capcode, *tcstr, buf[2048];
 
 #ifndef HAVE_NUMCODES
-    static char *numcodes[] = {
+    static __thread char *numcodes[] = {
 	"co", "it", "lh", "lw", "li", "lm", "sg", "ma", "Co", "pa", "MW",
 	"NC", "Nl", "pb", "vt", "ws", "Yo", "Yp", "Ya", "BT", "Yc", "Yb",
 	"Yd", "Ye", "Yf", "Yg", "Yh", "Yi", "Yk", "Yj", "Yl", "Ym", "Yn",
@@ -225,7 +225,7 @@ scantermcap(UNUSED(HashTable ht), ScanFunc func, int flags)
 #endif
 
 #ifndef HAVE_STRCODES
-    static char *zstrcodes[] = {
+    static __thread char *zstrcodes[] = {
 	"ac", "bt", "bl", "cr", "ZA", "ZB", "ZC", "ZD", "cs", "rP", "ct",
 	"MC", "cl", "cb", "ce", "cd", "ch", "CC", "CW", "cm", "do", "ho",
 	"vi", "le", "CM", "ve", "nd", "ll", "up", "vs", "ZE", "dc", "dl",
@@ -308,14 +308,19 @@ scantermcap(UNUSED(HashTable ht), ScanFunc func, int flags)
     }
 }
 
-static struct paramdef partab[] = {
+static __thread struct paramdef partab[] = {
     SPECIALPMDEF("termcap", PM_READONLY, NULL, gettermcap, scantermcap)
 };
 
 /**/
 #endif /* HAVE_TGETENT */
 
-static struct features module_features = {
+/* AOK: see tools/zsh-tls-fix-tables.py. */
+static __thread struct features aok_tv_module_features;
+static __thread char aok_ti_module_features;
+static struct features *aok_tf_module_features(void) {
+    if (!aok_ti_module_features) {
+        struct features aok_tmp = {
 #ifdef HAVE_TGETENT
     bintab, sizeof(bintab)/sizeof(*bintab),
 #else
@@ -330,6 +335,13 @@ static struct features module_features = {
 #endif
     0
 };
+        aok_tv_module_features = aok_tmp;
+        aok_ti_module_features = 1;
+    }
+    return &aok_tv_module_features;
+}
+#define module_features (*aok_tf_module_features())
+
 
 /**/
 int

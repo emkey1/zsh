@@ -36,7 +36,7 @@
  * because that's a dynamic value on Linux                        */
 
 /**/
-mod_export int *sigtrapped;
+__thread mod_export int *sigtrapped;
 
 /*
  * Trap programme lists for each signal.
@@ -50,17 +50,17 @@ mod_export int *sigtrapped;
  */
 
 /**/
-mod_export Eprog *siglists;
+__thread mod_export Eprog *siglists;
 
 /* Total count of trapped signals */
 
 /**/
-mod_export volatile int nsigtrapped;
+__thread mod_export volatile int nsigtrapped;
 
 /* Running an exit trap? */
 
 /**/
-int in_exit_trap;
+__thread int in_exit_trap;
 
 /*
  * Flag that exit trap has been set in POSIX mode.
@@ -69,16 +69,16 @@ int in_exit_trap;
  */
 
 /**/
-static int exit_trap_posix;
+static __thread int exit_trap_posix;
 
 /* Variables used by signal queueing */
 
 /**/
-mod_export volatile int queueing_enabled, queue_front, queue_rear;
+__thread mod_export volatile int queueing_enabled, queue_front, queue_rear;
 /**/
-mod_export int signal_queue[MAX_QUEUE_SIZE];
+__thread mod_export int signal_queue[MAX_QUEUE_SIZE];
 /**/
-mod_export sigset_t signal_mask_queue[MAX_QUEUE_SIZE];
+__thread mod_export sigset_t signal_mask_queue[MAX_QUEUE_SIZE];
 #ifdef DEBUG
 /**/
 mod_export volatile int queue_in;
@@ -87,9 +87,9 @@ mod_export volatile int queue_in;
 /* Variables used by trap queueing */
 
 /**/
-static volatile int trap_queueing_enabled, trap_queue_front, trap_queue_rear;
+static __thread volatile int trap_queueing_enabled, trap_queue_front, trap_queue_rear;
 /**/
-static int trap_queue[MAX_QUEUE_SIZE];
+static __thread int trap_queue[MAX_QUEUE_SIZE];
 
 /* Install signal handler for given signal.           *
  * If possible, we want to make sure that interrupted *
@@ -235,7 +235,7 @@ signal_suspend(UNUSED(int sig), int wait_cmd)
 
 /* last signal we handled: race prone, or what? */
 /**/
-int last_signal;
+__thread int last_signal;
 
 /*
  * Wait for any processes that have changed state.
@@ -266,11 +266,28 @@ wait_for_processes(void)
 	 * If we want usage information, we need to use wait3.
 	 */
 #if defined(HAVE_WAIT3) || defined(HAVE_WAITPID)
-# ifdef WCONTINUED
-# define WAITFLAGS (WNOHANG|WUNTRACED|WCONTINUED)
-# else
+/* AOK: WCONTINUED is deliberately NOT asked for.
+ *
+ * A native zsh's waits go through kernel/native_libc.c, which passes the wait
+ * options to the GUEST unchanged -- and Darwin's WCONTINUED is 0x10 where the
+ * guest's is 8, which is Darwin's WSTOPPED. The guest answers EINVAL for an
+ * option it does not recognise. bash survives that because it retries without
+ * WCONTINUED; zsh does not retry, it prints "wait failed" and BREAKS out of
+ * wait_for_processes, so nothing is reaped at all -- and the message is
+ * swallowed, because zwarn returns silently while errflag is set.
+ *
+ * The symptom was a command substitution that never returned: the child had
+ * exited, the parent's waitforpid loop asked kill(pid, 0) which still succeeds
+ * for a zombie, and the SIGCHLD handler that would have reaped it failed on
+ * its first call, every time.
+ *
+ * The cost is that a job continued by SIGCONT is not noticed until its next
+ * state change, which is what a zsh built on a system without WCONTINUED does.
+ * The mapping is not the fix: enabling it properly made bash hang, which is a
+ * bug in what the guest reports for a continued child (see the note in
+ * kernel/native_libc.c) and belongs with that.
+ */
 # define WAITFLAGS (WNOHANG|WUNTRACED)
-# endif
 #endif
 #ifdef HAVE_WAIT3
 # ifdef HAVE_GETRUSAGE
@@ -614,8 +631,8 @@ struct savetrap {
     void *list;
 };
 
-static LinkList savetraps;
-static int dontsavetrap;
+static __thread LinkList savetraps;
+static __thread int dontsavetrap;
 
 /*
  * Save the current trap by copying it.  This does nothing to
@@ -1054,19 +1071,19 @@ unqueue_traps(void)
 
 /* Are we already executing a trap? */
 /**/
-volatile int intrap;
+__thread volatile int intrap;
 
 /* Is the current trap a function? */
 
 /**/
-volatile int trapisfunc;
+__thread volatile int trapisfunc;
 
 /*
  * If the current trap is not a function, at what function depth
  * did the trap get called?
  */
 /**/
-volatile int traplocallevel;
+__thread volatile int traplocallevel;
 
 /*
  * sig is the signal number.
