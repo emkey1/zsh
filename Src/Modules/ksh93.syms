@@ -1,0 +1,12 @@
+E#ifndef have_Src_Modules_ksh93_globals
+E#define have_Src_Modules_ksh93_globals
+E
+Lstatic int ksh93_wrapper(Eprog prog,FuncWrap w,char*name);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(Module m);
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Modules_ksh93_globals */

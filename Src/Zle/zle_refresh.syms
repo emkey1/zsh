@@ -1,0 +1,61 @@
+E#ifndef have_Src_Zle_zle_refresh_globals
+E#define have_Src_Zle_zle_refresh_globals
+E
+Eextern char*lpromptbuf;
+Eextern char*rpromptbuf;
+Eextern zattr pmpt_attr;
+Eextern zattr rpmpt_attr;
+Eextern zattr prompt_attr;
+Xnlnct
+Eextern mod_import_variable int nlnct;
+Xshowinglist
+Eextern mod_import_variable int showinglist;
+Xlistshown
+Eextern mod_import_variable int listshown;
+Xlastlistlen
+Eextern mod_import_variable int lastlistlen;
+Xclearflag
+Eextern mod_import_variable int clearflag;
+Xclearlist
+Eextern mod_import_variable int clearlist;
+Eextern int trashedzle;
+Eextern ZLE_STRING_T predisplay;
+Eextern ZLE_STRING_T postdisplay;
+Eextern int predisplaylen;
+Eextern int postdisplaylen;
+Eextern struct region_highlight*region_highlights;
+Eextern int n_region_highlights;
+Eextern int region_active;
+Eextern char*tcout_func_name;
+Eextern int cost;
+Lstatic void zle_set_highlight(void);
+Lstatic void zle_free_highlight(void);
+Eextern char**get_region_highlight(UNUSED(Param pm));
+Eextern void set_region_highlight(UNUSED(Param pm),char**aval);
+Eextern void unset_region_highlight(Param pm,int exp);
+Eextern void zwcputc(const REFRESH_ELEMENT*c);
+Eextern void resetvideo(void);
+Lstatic void scrollwindow(int tline);
+Xzrefresh
+Eextern mod_import_function void zrefresh(void);
+Lstatic void refreshline(int ln);
+Eextern void moveto(int ln,int cl);
+Xtcmultout
+Eextern mod_import_function int tcmultout(int cap,int multcap,int ct);
+Lstatic void tc_rightcurs(int ct);
+Xtc_downcurs
+Eextern mod_import_function int tc_downcurs(int ct);
+Lstatic void tcout_via_func(int cap,int arg,int(*outc)(int));
+Xtcout
+Eextern mod_import_function void tcout(int cap);
+Lstatic void tcoutarg(int cap,int arg);
+Xclearscreen
+Eextern mod_import_function int clearscreen(UNUSED(char**args));
+Xredisplay
+Eextern mod_import_function int redisplay(UNUSED(char**args));
+Lstatic void singlerefresh(ZLE_STRING_T tmpline,int tmpll,int tmpcs);
+Lstatic void singmoveto(int pos);
+Eextern void zle_refresh_boot(void);
+Eextern void zle_refresh_finish(void);
+E
+E#endif /* !have_Src_Zle_zle_refresh_globals */

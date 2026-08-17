@@ -1,0 +1,18 @@
+E#ifndef have_Src_Zle_complist_globals
+E#define have_Src_Zle_complist_globals
+E
+Lstatic int asklistscroll(int ml);
+Lstatic int compprintnl(int ml);
+Lstatic int compprintfmt(char*fmt,int n,int dopr,int doesc,int ml,int*stop);
+Lstatic int compzputs(char const*s,int ml);
+Lstatic int compprintlist(int showall);
+Lstatic int clprintm(Cmgroup g,Cmatch*mp,int mc,int ml,int lastc,int width);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Lstatic void menuselect_bindings(void);
+Eextern int boot_(Module m);
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Zle_complist_globals */

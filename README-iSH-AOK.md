@@ -1,0 +1,44 @@
+# zsh, configured for embedding in iSH-AOK
+
+This branch is upstream zsh with **no source changes** — `git diff` against the
+base commit touches not one `.c` or `.h` that zsh ships. What it adds is the
+output of a `configure` run, committed on purpose.
+
+## Why generated files are committed
+
+zsh generates a great deal of its own source: `config.h`, `Src/signames.c`,
+`Src/bltinmods.list`, and for every module a `.mdh`, an `.epro` and a `.pro`,
+produced by `mkmakemod.sh`, `makepro.awk` and `mkbltnmlst.sh`. iSH-AOK compiles
+zsh with meson and never runs zsh's own `make`, so reproducing that machinery
+would mean maintaining a second build system. Committing the generated sources
+is the smaller commitment — and it means a checkout builds without a configure
+step.
+
+Upstream's `.gitignore` excludes all of it, which is right for upstream and
+wrong here, so these are force-added.
+
+Deliberately **not** committed: object files, the linked `zsh` binary,
+`config.status`, `config.log` and the generated `Makefile`s. Nothing here uses
+them.
+
+## How it was configured
+
+Termcap-only, with a curated `config.modules` so every module links statically.
+Both matter:
+
+- **No terminfo.** The iOS SDK ships the curses `.tbd` stubs but no `curses.h`
+  or `term.h`, so a terminfo build cannot compile for device.
+- **Static modules.** A native program in iSH-AOK cannot `dlopen`, and
+  `--disable-dynamic` alone is not enough — it maps 24 of 42 modules to
+  `link=no`, including `zsh/regex`, after which `[[ abc =~ ^a.c$ ]]` fails at
+  runtime with "failed to load module".
+
+See `tools/configure-zsh.sh` in the iSH-AOK repo for the exact invocation.
+
+## Licence
+
+zsh's own licence is permissive (MIT-style) and there is **no GPL in its
+compiled C**. Three completion *scripts* are GPLv2 —
+`Completion/Linux/Command/_qdbus`, `Completion/openSUSE/Command/_osc`,
+`Completion/openSUSE/Command/_zypper` — data rather than code, and excluded if
+the function library is ever shipped.

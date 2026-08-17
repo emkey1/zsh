@@ -1,0 +1,58 @@
+E#ifndef have_Src_mem_globals
+E#define have_Src_mem_globals
+E
+E#ifdef ZSH_HEAP_DEBUG
+L#ifdef ZSH_HEAP_DEBUG
+Xlast_heap_id
+Eextern mod_import_variable Heapid last_heap_id;
+E#endif
+L#endif
+Xnew_heaps
+Eextern mod_import_function Heap new_heaps(void);
+Xold_heaps
+Eextern mod_import_function void old_heaps(Heap old);
+Xswitch_heaps
+Eextern mod_import_function Heap switch_heaps(Heap new);
+Xpushheap
+Eextern mod_import_function void pushheap(void);
+Xfreeheap
+Eextern mod_import_function void freeheap(void);
+Xpopheap
+Eextern mod_import_function void popheap(void);
+Xzheapptr
+Eextern mod_import_function void*zheapptr(void*p);
+Xzhalloc
+Eextern mod_import_function void*zhalloc(size_t size);
+Xhrealloc
+Eextern mod_import_function void*hrealloc(char*p,size_t old,size_t new);
+E#ifdef ZSH_HEAP_DEBUG
+L#ifdef ZSH_HEAP_DEBUG
+Xmemory_validate
+Eextern mod_import_function int memory_validate(Heapid heap_id);
+E#endif
+L#endif
+Xhcalloc
+Eextern mod_import_function void*hcalloc(size_t size);
+Xzalloc
+Eextern mod_import_function void*zalloc(size_t size);
+Xzshcalloc
+Eextern mod_import_function void*zshcalloc(size_t size);
+Xzrealloc
+Eextern mod_import_function void*zrealloc(void*ptr,size_t size);
+E#ifdef ZSH_MEM
+L#ifdef ZSH_MEM
+Xzfree
+Eextern mod_import_function void zfree(void*p,int sz);
+Xzsfree
+Eextern mod_import_function void zsfree(char*p);
+Eextern int bin_mem(char*name,char**argv,Options ops,int func);
+E#else				/* not ZSH_MEM */
+L#else				/* not ZSH_MEM */
+Xzfree
+Eextern mod_import_function void zfree(void*p,UNUSED(int sz));
+Xzsfree
+Eextern mod_import_function void zsfree(char*p);
+E#endif
+L#endif
+E
+E#endif /* !have_Src_mem_globals */

@@ -1,0 +1,13 @@
+E#ifndef have_Src_context_globals
+E#define have_Src_context_globals
+E
+Xzcontext_save_partial
+Eextern mod_import_function void zcontext_save_partial(int parts);
+Xzcontext_save
+Eextern mod_import_function void zcontext_save(void);
+Xzcontext_restore_partial
+Eextern mod_import_function void zcontext_restore_partial(int parts);
+Xzcontext_restore
+Eextern mod_import_function void zcontext_restore(void);
+E
+E#endif /* !have_Src_context_globals */

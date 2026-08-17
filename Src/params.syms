@@ -1,0 +1,334 @@
+E#ifndef have_Src_params_globals
+E#define have_Src_params_globals
+E
+Xlocallevel
+Eextern mod_import_variable int locallevel;
+Eextern char**pparams;
+Eextern char**cdpath;
+Eextern char**fpath;
+Eextern char**mailpath;
+Eextern char**manpath;
+Eextern char**psvar;
+Eextern char**zsh_eval_context;
+Xpath
+Eextern mod_import_variable char**path;
+Xfignore
+Eextern mod_import_variable char**fignore;
+Eextern char*argzero;
+Eextern char*ifs;
+Eextern char*nullcmd;
+Eextern char*oldpwd;
+Eextern char*posixzero;
+Eextern char*prompt;
+Eextern char*prompt2;
+Eextern char*prompt3;
+Eextern char*prompt4;
+Eextern char*readnullcmd;
+Eextern char*rprompt;
+Eextern char*rprompt2;
+Eextern char*sprompt;
+Eextern char*wordchars;
+Eextern char*zoptarg;
+Eextern char*zsh_terminfo;
+Eextern char*zsh_terminfodirs;
+Xhome
+Eextern mod_import_variable char*home;
+Xpostedit
+Eextern mod_import_variable char*postedit;
+Xterm
+Eextern mod_import_variable char*term;
+Xttystrname
+Eextern mod_import_variable char*ttystrname;
+Xpwd
+Eextern mod_import_variable char*pwd;
+Xlastval
+Eextern mod_import_variable volatile zlong lastval;
+Xmypid
+Eextern mod_import_variable zlong mypid;
+Xlastpid
+Eextern mod_import_variable zlong lastpid;
+Xzterm_columns
+Eextern mod_import_variable zlong zterm_columns;
+Xzterm_lines
+Eextern mod_import_variable zlong zterm_lines;
+Xrprompt_indent
+Eextern mod_import_variable zlong rprompt_indent;
+Xppid
+Eextern mod_import_variable zlong ppid;
+Xzsh_subshell
+Eextern mod_import_variable zlong zsh_subshell;
+Xzterm_columns_preserve
+Eextern mod_import_variable int zterm_columns_preserve;
+Xzterm_lines_preserve
+Eextern mod_import_variable int zterm_lines_preserve;
+Xzsh_funcnest
+Eextern mod_import_variable zlong zsh_funcnest;
+Eextern zlong lineno;
+Eextern zlong zoptind;
+Eextern zlong shlvl;
+Xbangchar
+Eextern mod_import_variable unsigned char bangchar;
+Eextern unsigned char hatchar;
+Eextern unsigned char hashchar;
+Eextern unsigned char keyboardhackchar;
+Eextern struct timespec shtimer;
+Xtermflags
+Eextern mod_import_variable int termflags;
+Xstdscalar_gsu
+Eextern mod_import_variable const struct gsu_scalar stdscalar_gsu;
+Xvarscalar_gsu
+Eextern mod_import_variable const struct gsu_scalar varscalar_gsu;
+Xnullsetscalar_gsu
+Eextern mod_import_variable const struct gsu_scalar nullsetscalar_gsu;
+Xstdinteger_gsu
+Eextern mod_import_variable const struct gsu_integer stdinteger_gsu;
+Xvarinteger_gsu
+Eextern mod_import_variable const struct gsu_integer varinteger_gsu;
+Xnullsetinteger_gsu
+Eextern mod_import_variable const struct gsu_integer nullsetinteger_gsu;
+Xstdfloat_gsu
+Eextern mod_import_variable const struct gsu_float stdfloat_gsu;
+Xstdarray_gsu
+Eextern mod_import_variable const struct gsu_array stdarray_gsu;
+Xvararray_gsu
+Eextern mod_import_variable const struct gsu_array vararray_gsu;
+Xstdhash_gsu
+Eextern mod_import_variable const struct gsu_hash stdhash_gsu;
+Xnullsethash_gsu
+Eextern mod_import_variable const struct gsu_hash nullsethash_gsu;
+Xcolonarr_gsu
+Eextern mod_import_variable const struct gsu_scalar colonarr_gsu;
+Xparamtab
+Eextern mod_import_variable HashTable paramtab;
+Xrealparamtab
+Eextern mod_import_variable HashTable realparamtab;
+Xnewparamtable
+Eextern mod_import_function HashTable newparamtable(int size,char const*name);
+Lstatic Param loadparamnode(HashTable ht,Param pm,const char*nam);
+Lstatic HashNode getparamnode(HashTable ht,const char*nam);
+Lstatic void scancopyparams(HashNode hn,UNUSED(int flags));
+Eextern HashTable copyparamtable(HashTable ht,char*name);
+Xdeleteparamtable
+Eextern mod_import_function void deleteparamtable(HashTable t);
+Xscancountparams
+Eextern mod_import_function void scancountparams(UNUSED(HashNode hn),int flags);
+Lstatic void scanparamvals(HashNode hn,int flags);
+Eextern char**paramvalarr(HashTable ht,int flags);
+Lstatic char**getvaluearr(Value v);
+Eextern int issetvar(char*name);
+Eextern void createparamtable(void);
+Lstatic void assigngetset(Param pm);
+Xcreateparam
+Eextern mod_import_function Param createparam(char*name,int flags);
+Lstatic void shempty(void);
+Xcreatespecialhash
+Eextern mod_import_function Param createspecialhash(char*name,GetNodeFunc get,ScanTabFunc scan,int flags);
+Eextern void copyparam(Param tpm,Param pm,int fakecopy);
+Xisident
+Eextern mod_import_function int isident(char*s);
+Lstatic zlong getarg(char**str,int*inv,Value v,int a2,zlong*w,int*prevcharlen,int*nextcharlen,int scanflags);
+Eextern int getindex(char**pptr,Value v,int scanflags);
+Xgetvalue
+Eextern mod_import_function Value getvalue(Value v,char**pptr,int bracks);
+Xfetchvalue
+Eextern mod_import_function Value fetchvalue(Value v,char**pptr,int bracks,int scanflags);
+Xgetstrvalue
+Eextern mod_import_function char*getstrvalue(Value v);
+Xgetarrvalue
+Eextern mod_import_function char**getarrvalue(Value v);
+Xgetintvalue
+Eextern mod_import_function zlong getintvalue(Value v);
+Eextern mnumber getnumvalue(Value v);
+Eextern void export_param(Param pm);
+Xsetstrvalue
+Eextern mod_import_function void setstrvalue(Value v,char*val);
+Lstatic void assignstrvalue(Value v,char*val,int flags);
+Eextern void setnumvalue(Value v,mnumber val);
+Xsetarrvalue
+Eextern mod_import_function void setarrvalue(Value v,char**val);
+Xgetiparam
+Eextern mod_import_function zlong getiparam(char*s);
+Eextern mnumber getnparam(char*s);
+Xgetsparam
+Eextern mod_import_function char*getsparam(char*s);
+Xgetsparam_u
+Eextern mod_import_function char*getsparam_u(char*s);
+Xgetaparam
+Eextern mod_import_function char**getaparam(char*s);
+Xgethparam
+Eextern mod_import_function char**gethparam(char*s);
+Xgethkparam
+Eextern mod_import_function char**gethkparam(char*s);
+Lstatic void check_warn_pm(Param pm,const char*pmtype,int created,int may_warn_about_nested_vars);
+Xassignsparam
+Eextern mod_import_function Param assignsparam(char*s,char*val,int flags);
+Xsetsparam
+Eextern mod_import_function Param setsparam(char*s,char*val);
+Xassignaparam
+Eextern mod_import_function Param assignaparam(char*s,char**val,int flags);
+Xsetaparam
+Eextern mod_import_function Param setaparam(char*s,char**aval);
+Xsethparam
+Eextern mod_import_function Param sethparam(char*s,char**val);
+Lstatic Param assignnparam(char*s,mnumber val,int flags);
+Xsetnparam
+Eextern mod_import_function Param setnparam(char*s,mnumber val);
+Xassigniparam
+Eextern mod_import_function Param assigniparam(char*s,zlong val,int flags);
+Xsetiparam
+Eextern mod_import_function Param setiparam(char*s,zlong val);
+Xsetiparam_no_convert
+Eextern mod_import_function Param setiparam_no_convert(char*s,zlong val);
+Xresetparam
+Eextern mod_import_function int resetparam(Param pm,int flags);
+Xunsetparam
+Eextern mod_import_function void unsetparam(char*s);
+Xunsetparam_pm
+Eextern mod_import_function int unsetparam_pm(Param pm,int altflag,int exp);
+Xstdunsetfn
+Eextern mod_import_function void stdunsetfn(Param pm,UNUSED(int exp));
+Xintgetfn
+Eextern mod_import_function zlong intgetfn(Param pm);
+Lstatic void intsetfn(Param pm,zlong x);
+Lstatic double floatgetfn(Param pm);
+Lstatic void floatsetfn(Param pm,double x);
+Xstrgetfn
+Eextern mod_import_function char*strgetfn(Param pm);
+Xstrsetfn
+Eextern mod_import_function void strsetfn(Param pm,char*x);
+Xarrgetfn
+Eextern mod_import_function char**arrgetfn(Param pm);
+Xarrsetfn
+Eextern mod_import_function void arrsetfn(Param pm,char**x);
+Xhashgetfn
+Eextern mod_import_function HashTable hashgetfn(Param pm);
+Xhashsetfn
+Eextern mod_import_function void hashsetfn(Param pm,HashTable x);
+Xnullsethashfn
+Eextern mod_import_function void nullsethashfn(UNUSED(Param pm),HashTable x);
+Lstatic void arrhashsetfn(Param pm,char**val,int flags);
+Xnullstrsetfn
+Eextern mod_import_function void nullstrsetfn(UNUSED(Param pm),char*x);
+Xnullintsetfn
+Eextern mod_import_function void nullintsetfn(UNUSED(Param pm),UNUSED(zlong x));
+Xnullunsetfn
+Eextern mod_import_function void nullunsetfn(UNUSED(Param pm),UNUSED(int exp));
+Xintvargetfn
+Eextern mod_import_function zlong intvargetfn(Param pm);
+Xintvarsetfn
+Eextern mod_import_function void intvarsetfn(Param pm,zlong x);
+Eextern void zlevarsetfn(Param pm,zlong x);
+Xstrvarsetfn
+Eextern mod_import_function void strvarsetfn(Param pm,char*x);
+Xstrvargetfn
+Eextern mod_import_function char*strvargetfn(Param pm);
+Xarrvargetfn
+Eextern mod_import_function char**arrvargetfn(Param pm);
+Xarrvarsetfn
+Eextern mod_import_function void arrvarsetfn(Param pm,char**x);
+Eextern char*colonarrgetfn(Param pm);
+Eextern void colonarrsetfn(Param pm,char*x);
+Eextern char*tiedarrgetfn(Param pm);
+Eextern void tiedarrsetfn(Param pm,char*x);
+Eextern void tiedarrunsetfn(Param pm,UNUSED(int exp));
+Lstatic void simple_arrayuniq(char**x,int freeok);
+Lstatic void arrayuniq_freenode(HashNode hn);
+Eextern HashTable newuniqtable(zlong size);
+Lstatic void arrayuniq(char**x,int freeok);
+Eextern void uniqarray(char**x);
+Eextern void zhuniqarray(char**x);
+Eextern zlong poundgetfn(UNUSED(Param pm));
+Eextern zlong randomgetfn(UNUSED(Param pm));
+Eextern void randomsetfn(UNUSED(Param pm),zlong v);
+Eextern zlong intsecondsgetfn(UNUSED(Param pm));
+Eextern void intsecondssetfn(UNUSED(Param pm),zlong x);
+Eextern double floatsecondsgetfn(UNUSED(Param pm));
+Eextern void floatsecondssetfn(UNUSED(Param pm),double x);
+Eextern double getrawseconds(void);
+Eextern void setrawseconds(double x);
+Eextern int setsecondstype(Param pm,int on,int off);
+Eextern char*usernamegetfn(UNUSED(Param pm));
+Eextern void usernamesetfn(UNUSED(Param pm),char*x);
+Eextern zlong uidgetfn(UNUSED(Param pm));
+Eextern void uidsetfn(UNUSED(Param pm),zlong x);
+Eextern zlong euidgetfn(UNUSED(Param pm));
+Eextern void euidsetfn(UNUSED(Param pm),zlong x);
+Eextern zlong gidgetfn(UNUSED(Param pm));
+Eextern void gidsetfn(UNUSED(Param pm),zlong x);
+Eextern zlong egidgetfn(UNUSED(Param pm));
+Eextern void egidsetfn(UNUSED(Param pm),zlong x);
+Eextern zlong ttyidlegetfn(UNUSED(Param pm));
+Eextern char*ifsgetfn(UNUSED(Param pm));
+Eextern void ifssetfn(UNUSED(Param pm),char*x);
+Lstatic void clear_mbstate(void);
+Lstatic void setlang(char*x);
+Eextern void lc_allsetfn(Param pm,char*x);
+Eextern void langsetfn(Param pm,char*x);
+Eextern void lcsetfn(Param pm,char*x);
+Lstatic void argzerosetfn(UNUSED(Param pm),char*x);
+Lstatic char*argzerogetfn(UNUSED(Param pm));
+Lstatic char*argngetfn(Param pm);
+Lstatic void argnsetfn(Param pm,char*x);
+Lstatic void argnunsetfn(Param pm,UNUSED(int exp));
+Eextern zlong histsizegetfn(UNUSED(Param pm));
+Eextern void histsizesetfn(UNUSED(Param pm),zlong v);
+Eextern zlong savehistsizegetfn(UNUSED(Param pm));
+Eextern void savehistsizesetfn(UNUSED(Param pm),zlong v);
+Eextern void errnosetfn(UNUSED(Param pm),zlong x);
+Eextern zlong errnogetfn(UNUSED(Param pm));
+Eextern char*keyboardhackgetfn(UNUSED(Param pm));
+Eextern void keyboardhacksetfn(UNUSED(Param pm),char*x);
+Eextern char*histcharsgetfn(UNUSED(Param pm));
+Eextern void histcharssetfn(UNUSED(Param pm),char*x);
+Eextern char*homegetfn(UNUSED(Param pm));
+Eextern void homesetfn(UNUSED(Param pm),char*x);
+Eextern char*wordcharsgetfn(UNUSED(Param pm));
+Eextern void wordcharssetfn(UNUSED(Param pm),char*x);
+Eextern char*underscoregetfn(UNUSED(Param pm));
+Eextern char*termgetfn(UNUSED(Param pm));
+Eextern void termsetfn(UNUSED(Param pm),char*x);
+Eextern char*terminfogetfn(UNUSED(Param pm));
+Eextern void terminfosetfn(Param pm,char*x);
+Eextern char*terminfodirsgetfn(UNUSED(Param pm));
+Eextern void terminfodirssetfn(Param pm,char*x);
+Lstatic char**pipestatgetfn(UNUSED(Param pm));
+Lstatic void pipestatsetfn(UNUSED(Param pm),char**x);
+Eextern void arrfixenv(char*s,char**t);
+Eextern int zputenv(char*str);
+E#ifndef USE_SET_UNSET_ENV
+L#ifndef USE_SET_UNSET_ENV
+Lstatic int findenv(char*name,int*pos);
+E#endif
+L#endif
+Xzgetenv
+Eextern mod_import_function char*zgetenv(char*name);
+Lstatic void copyenvstr(char*s,char*value,int flags);
+Eextern void addenv(Param pm,char*value);
+Lstatic char*mkenvstr(char*name,char*value,int flags);
+Eextern void delenvvalue(char*x);
+Eextern void delenv(Param pm);
+Eextern void convbase_ptr(char*s,zlong v,int base,int*ndigits);
+Xconvbase
+Eextern mod_import_function void convbase(char*s,zlong v,int base);
+Eextern char*convbase_underscore(char*s,zlong v,int base,int underscore);
+Eextern char*convfloat(double dval,int digits,int flags,FILE*fout);
+Eextern char*convfloat_underscore(double dval,int underscore);
+Xstartparamscope
+Eextern mod_import_function void startparamscope(void);
+Xendparamscope
+Eextern mod_import_function void endparamscope(void);
+Lstatic void scanendscope(HashNode hn,UNUSED(int flags));
+Eextern void freeparamnode(HashNode hn);
+Xprintparamnode
+Eextern mod_import_function void printparamnode(HashNode hn,int printflags);
+Xresolve_nameref
+Eextern mod_import_function Param resolve_nameref(Param pm);
+Lstatic Param resolve_nameref_rec(Param pm,const Param stop,int keep_lastref);
+Xsetloopvar
+Eextern mod_import_function void setloopvar(char*name,char*value);
+Lstatic void setscope(Param pm);
+Lstatic void setscope_base(Param pm,int base);
+Lstatic Param upscope(Param pm,const Param ref);
+Lstatic int valid_refname(char*val,int flags);
+E
+E#endif /* !have_Src_params_globals */

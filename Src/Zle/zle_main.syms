@@ -1,0 +1,95 @@
+E#ifndef have_Src_Zle_zle_main_globals
+E#define have_Src_Zle_zle_main_globals
+E
+Xzleline
+Eextern mod_import_variable ZLE_STRING_T zleline;
+Xzlecs
+Eextern mod_import_variable int zlecs;
+Xzlell
+Eextern mod_import_variable int zlell;
+Xincompctlfunc
+Eextern mod_import_variable int incompctlfunc;
+Xhascompmod
+Eextern mod_import_variable int hascompmod;
+Xzle_recursive
+Eextern mod_import_variable int zle_recursive;
+Eextern int zlereadflags;
+Eextern int zlecontext;
+Eextern int done;
+Eextern int mark;
+Lstatic int pre_zle_status;
+Xlastchar
+Eextern mod_import_variable int lastchar;
+Xlastchar_wide
+Eextern mod_import_variable ZLE_INT_T lastchar_wide;
+Xlastchar_wide_valid
+Eextern mod_import_variable int lastchar_wide_valid;
+Xlbindk
+Eextern mod_import_variable Thingy lbindk;
+Xbindk
+Eextern mod_import_variable Thingy bindk;
+Eextern int insmode;
+Xlastcmd
+Eextern mod_import_variable int lastcmd;
+Xcompwidget
+Eextern mod_import_variable Widget compwidget;
+Xstatusline
+Eextern mod_import_variable char*statusline;
+Eextern int stackhist;
+Eextern int stackcs;
+Eextern zlong vistartchange;
+Xzmod
+Eextern mod_import_variable struct modifier zmod;
+Eextern int prefixflag;
+Eextern int kungetct;
+Xzlenoargs
+Eextern mod_import_variable char*zlenoargs[1];
+Eextern int nwatch;
+Eextern Watch_fd watch_fds;
+Xzsetterm
+Eextern mod_import_function void zsetterm(void);
+Eextern void ungetbyte(int ch);
+Eextern void ungetbytes(char*s,int len);
+Eextern void ungetbytes_unmeta(char*s,int len);
+Xgetbyte
+Eextern mod_import_function int getbyte(long do_keytmout,int*timeout,int full);
+Xgetfullchar
+Eextern mod_import_function ZLE_INT_T getfullchar(int do_keytmout);
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Xgetrestchar
+Eextern mod_import_function ZLE_INT_T getrestchar(int inchar,char*outstr,int*outcount);
+E#endif
+L#endif
+Xredrawhook
+Eextern mod_import_function void redrawhook(void);
+Eextern void zlecore(void);
+Eextern char*zleread(char**lp,char**rp,int flags,int context,char*init,char*finish);
+Lstatic int execimmortal(Thingy func,char**args);
+Eextern int execzlefunc(Thingy func,char**args,int set_bindk,int set_lbindk);
+Lstatic void initmodifier(struct modifier*mp);
+Lstatic void handleprefixes(void);
+Lstatic int savekeymap(char*cmdname,char*oldname,char*newname,Keymap*savemapptr);
+Lstatic void restorekeymap(char*cmdname,char*oldname,char*newname,Keymap savemap);
+Xvaredarg
+Eextern mod_import_variable char*varedarg;
+Lstatic int bin_vared(char*name,char**args,Options ops,UNUSED(int func));
+Eextern int describekeybriefly(UNUSED(char**args));
+Lstatic void scanfindfunc(char*seq,Thingy func,UNUSED(char*str),void*magic);
+Eextern int whereis(UNUSED(char**args));
+Eextern int recursiveedit(UNUSED(char**args));
+Eextern void reexpandprompt(void);
+Eextern int resetprompt(UNUSED(char**args));
+Lstatic void zle_resetprompt(void);
+Xtrashzle
+Eextern mod_import_function void trashzle(void);
+Xzlehooks
+Eextern mod_import_variable struct hookdef zlehooks[];
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(Module m);
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Zle_zle_main_globals */

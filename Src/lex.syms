@@ -1,0 +1,77 @@
+E#ifndef have_Src_lex_globals
+E#define have_Src_lex_globals
+E
+Xztokens
+Eextern mod_import_variable char ztokens[];
+Eextern char*zshlextext;
+Xtokstr
+Eextern mod_import_variable char*tokstr;
+Xtok
+Eextern mod_import_variable enum lextok tok;
+Xtokfd
+Eextern mod_import_variable int tokfd;
+Eextern zlong toklineno;
+Xlexstop
+Eextern mod_import_variable int lexstop;
+Xisfirstln
+Eextern mod_import_variable int isfirstln;
+Eextern int isfirstch;
+Eextern int inalmore;
+Eextern int nocorrect;
+Xzlemetacs
+Eextern mod_import_variable int zlemetacs;
+Xzlemetall
+Eextern mod_import_variable int zlemetall;
+Xinwhat
+Eextern mod_import_variable int inwhat;
+Xaddedx
+Eextern mod_import_variable int addedx;
+Xwb
+Eextern mod_import_variable int wb;
+Xwe
+Eextern mod_import_variable int we;
+Xwordbeg
+Eextern mod_import_variable int wordbeg;
+Xparbegin
+Eextern mod_import_variable int parbegin;
+Xparend
+Eextern mod_import_variable int parend;
+Xnoaliases
+Eextern mod_import_variable int noaliases;
+Xlexflags
+Eextern mod_import_variable int lexflags;
+Xnocomments
+Eextern mod_import_variable int nocomments;
+Eextern int lex_add_raw;
+Xtokstrings
+Eextern mod_import_variable char*tokstrings[WHILE+1];
+Eextern void lex_context_save(struct lex_stack*ls,int toplevel);
+Xlex_context_restore
+Eextern mod_import_function void lex_context_restore(const struct lex_stack*ls,int toplevel);
+Eextern void zshlex(void);
+Xctxtlex
+Eextern mod_import_function void ctxtlex(void);
+Eextern void initlextabs(void);
+Eextern void lexinit(void);
+Eextern void add(int c);
+Lstatic int isnumglob(void);
+Lstatic enum lextok gettok(void);
+Lstatic enum lextok gettokstr(int c,int sub);
+Lstatic int dquote_parse(char endchar,int sub);
+Xparsestr
+Eextern mod_import_function int parsestr(char**s);
+Xparsestrnoerr
+Eextern mod_import_function int parsestrnoerr(char**s);
+Xparse_subscript
+Eextern mod_import_function char*parse_subscript(char*s,int sub,int endchar);
+Xparse_subst_string
+Eextern mod_import_function int parse_subst_string(char*s);
+Lstatic void gotword(void);
+Eextern int exalias(void);
+Eextern void zshlex_raw_add(int c);
+Eextern void zshlex_raw_back(void);
+Eextern int zshlex_raw_mark(int offset);
+Eextern void zshlex_raw_back_to_mark(int mark);
+Lstatic int skipcomm(void);
+E
+E#endif /* !have_Src_lex_globals */

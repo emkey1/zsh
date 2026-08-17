@@ -1,0 +1,143 @@
+E#ifndef have_Src_Zle_zle_tricky_globals
+E#define have_Src_Zle_zle_tricky_globals
+E
+Xzlemetaline
+Eextern mod_import_variable char*zlemetaline;
+Xmetalinesz
+Eextern mod_import_variable int metalinesz;
+Xorigline
+Eextern mod_import_variable char*origline;
+Xorigcs
+Eextern mod_import_variable int origcs;
+Xorigll
+Eextern mod_import_variable int origll;
+Xclwsize
+Eextern mod_import_variable int clwsize;
+Xclwnum
+Eextern mod_import_variable int clwnum;
+Xclwpos
+Eextern mod_import_variable int clwpos;
+Xclwords
+Eextern mod_import_variable char**clwords;
+Xoffs
+Eextern mod_import_variable int offs;
+Xusemenu
+Eextern mod_import_variable int usemenu;
+Xuseglob
+Eextern mod_import_variable int useglob;
+Xwouldinstab
+Eextern mod_import_variable int wouldinstab;
+Xmenucmp
+Eextern mod_import_variable int menucmp;
+Xbrbeg
+Eextern mod_import_variable Brinfo brbeg;
+Xlastbrbeg
+Eextern mod_import_variable Brinfo lastbrbeg;
+Xbrend
+Eextern mod_import_variable Brinfo brend;
+Xlastbrend
+Eextern mod_import_variable Brinfo lastbrend;
+Xnbrbeg
+Eextern mod_import_variable int nbrbeg;
+Xnbrend
+Eextern mod_import_variable int nbrend;
+Xlastprebr
+Eextern mod_import_variable char*lastprebr;
+Xlastpostbr
+Eextern mod_import_variable char*lastpostbr;
+Xvalidlist
+Eextern mod_import_variable int validlist;
+Xshowagain
+Eextern mod_import_variable int showagain;
+Xqipre
+Eextern mod_import_variable char*qipre;
+Xqisuf
+Eextern mod_import_variable char*qisuf;
+Xautoq
+Eextern mod_import_variable char*autoq;
+Xcompfunc
+Eextern mod_import_variable char*compfunc;
+Xlastambig
+Eextern mod_import_variable int lastambig;
+Xbashlistfirst
+Eextern mod_import_variable int bashlistfirst;
+Xcfargs
+Eextern mod_import_variable char**cfargs;
+Xcfret
+Eextern mod_import_variable int cfret;
+Xcomprecursive
+Eextern mod_import_variable int comprecursive;
+Eextern int hascompwidgets;
+Lstatic int usetab(void);
+Eextern int completecall(char**args);
+Eextern int completeword(char**args);
+Xmenucomplete
+Eextern mod_import_function int menucomplete(char**args);
+Eextern int listchoices(UNUSED(char**args));
+Eextern int spellword(UNUSED(char**args));
+Eextern int deletecharorlist(char**args);
+Eextern int expandword(char**args);
+Eextern int expandorcomplete(char**args);
+Eextern int menuexpandorcomplete(char**args);
+Eextern int listexpand(UNUSED(char**args));
+Xreversemenucomplete
+Eextern mod_import_function int reversemenucomplete(char**args);
+Eextern int acceptandmenucomplete(char**args);
+Xlincmd
+Eextern mod_import_variable int lincmd;
+Xlinredir
+Eextern mod_import_variable int linredir;
+Xlinarr
+Eextern mod_import_variable int linarr;
+Xrdstr
+Eextern mod_import_variable char*rdstr;
+Xrdstrs
+Eextern mod_import_variable LinkList rdstrs;
+Xcmdstr
+Eextern mod_import_variable char*cmdstr;
+Xvarname
+Eextern mod_import_variable char*varname;
+Xinsubscr
+Eextern mod_import_variable int insubscr;
+Xkeypm
+Eextern mod_import_variable Param keypm;
+Xinstring
+Eextern mod_import_variable int instring;
+Xinbackt
+Eextern mod_import_variable int inbackt;
+Lstatic int checkparams(char*p);
+Lstatic int cmphaswilds(char*str);
+Eextern char*parambeg(char*s);
+Lstatic int docomplete(int lst);
+Lstatic void addx(char**ptmp);
+Xdupstrspace
+Eextern mod_import_function char*dupstrspace(const char*str);
+Xmetafy_line
+Eextern mod_import_function void metafy_line(void);
+Xunmetafy_line
+Eextern mod_import_function void unmetafy_line(void);
+Xfreebrinfo
+Eextern mod_import_function void freebrinfo(Brinfo p);
+Xdupbrinfo
+Eextern mod_import_function Brinfo dupbrinfo(Brinfo p,Brinfo*last,int heap);
+Lstatic char*get_comp_string(void);
+Xinststrlen
+Eextern mod_import_function int inststrlen(char*str,int move,int len);
+Lstatic int doexpansion(char*s,int lst,int olst,int explincmd);
+Lstatic int docompletion(char*s,int lst,int incmd);
+Xpfxlen
+Eextern mod_import_function int pfxlen(char*s,char*t);
+Xprintfmt
+Eextern mod_import_function int printfmt(char*fmt,int n,int dopr,int doesc);
+Eextern int listlist(LinkList l);
+Eextern int doexpandhist(void);
+Eextern void fixmagicspace(void);
+Eextern int magicspace(char**args);
+Eextern int expandhistory(UNUSED(char**args));
+Lstatic char*getcurcmd(int trackpos);
+Eextern int processcmd(UNUSED(char**args));
+Eextern int expandcmdpath(UNUSED(char**args));
+Eextern int expandorcompleteprefix(char**args);
+Eextern int endoflist(UNUSED(char**args));
+E
+E#endif /* !have_Src_Zle_zle_tricky_globals */

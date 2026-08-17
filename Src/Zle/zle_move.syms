@@ -1,0 +1,45 @@
+E#ifndef have_Src_Zle_zle_move_globals
+E#define have_Src_Zle_zle_move_globals
+E
+Eextern int alignmultiwordleft(int*pos,int setpos);
+Eextern int alignmultiwordright(int*pos,int setpos);
+Xinccs
+Eextern mod_import_function void inccs(void);
+Xdeccs
+Eextern mod_import_function void deccs(void);
+Xincpos
+Eextern mod_import_function void incpos(int*pos);
+Xdecpos
+Eextern mod_import_function void decpos(int*pos);
+Xbackwardmetafiedchar
+Eextern mod_import_function char*backwardmetafiedchar(char*start,char*endptr,convchar_t*retchr);
+Eextern int beginningofline(char**args);
+Eextern int endofline(char**args);
+Eextern int beginningoflinehist(char**args);
+Eextern int endoflinehist(char**args);
+Eextern int forwardchar(char**args);
+Eextern int backwardchar(char**args);
+Eextern int setmarkcommand(UNUSED(char**args));
+Eextern int exchangepointandmark(UNUSED(char**args));
+Eextern int visualmode(UNUSED(char**args));
+Eextern int visuallinemode(UNUSED(char**args));
+Eextern int deactivateregion(UNUSED(char**args));
+Eextern int vigotocolumn(UNUSED(char**args));
+Eextern int vimatchbracket(UNUSED(char**args));
+Eextern int viforwardchar(char**args);
+Eextern int vibackwardchar(char**args);
+Eextern int viendofline(UNUSED(char**args));
+Eextern int vibeginningofline(UNUSED(char**args));
+Eextern int vifindnextchar(char**args);
+Eextern int vifindprevchar(char**args);
+Eextern int vifindnextcharskip(char**args);
+Eextern int vifindprevcharskip(char**args);
+Eextern int vifindchar(int repeat,char**args);
+Eextern int virepeatfind(char**args);
+Eextern int virevrepeatfind(char**args);
+Eextern int vifirstnonblank(UNUSED(char**args));
+Eextern int visetmark(UNUSED(char**args));
+Eextern int vigotomark(UNUSED(char**args));
+Eextern int vigotomarkline(char**args);
+E
+E#endif /* !have_Src_Zle_zle_move_globals */

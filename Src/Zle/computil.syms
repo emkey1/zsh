@@ -1,0 +1,13 @@
+E#ifndef have_Src_Zle_computil_globals
+E#define have_Src_Zle_computil_globals
+E
+Lstatic int bin_compdescribe(char*nam,char**args,UNUSED(Options ops),UNUSED(int func));
+Lstatic int arrcontains(char**a,char*s,int colon);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Zle_computil_globals */

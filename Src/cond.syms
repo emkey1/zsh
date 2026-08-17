@@ -1,0 +1,19 @@
+E#ifndef have_Src_cond_globals
+E#define have_Src_cond_globals
+E
+Eextern int tracingcond;
+Eextern int evalcond(Estate state,char*fromtest);
+Lstatic int doaccess(char*s,int c);
+Lstatic struct stat*getstat(char*s);
+Lstatic mode_t dostat(char*s);
+Lstatic mode_t dolstat(char*s);
+Lstatic int optison(char*name,char*s);
+Xcond_str
+Eextern mod_import_function char*cond_str(char**args,int num,int raw);
+Xcond_val
+Eextern mod_import_function zlong cond_val(char**args,int num);
+Xcond_match
+Eextern mod_import_function int cond_match(char**args,int num,char*str);
+Lstatic void tracemodcond(char*name,char**args,int inf);
+E
+E#endif /* !have_Src_cond_globals */

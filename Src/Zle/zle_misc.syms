@@ -1,0 +1,70 @@
+E#ifndef have_Src_Zle_zle_misc_globals
+E#define have_Src_Zle_zle_misc_globals
+E
+Eextern void doinsert(ZLE_STRING_T zstr,int len);
+Xselfinsert
+Eextern mod_import_function int selfinsert(UNUSED(char**args));
+Xfixunmeta
+Eextern mod_import_function void fixunmeta(void);
+Xselfinsertunmeta
+Eextern mod_import_function int selfinsertunmeta(char**args);
+Eextern int deletechar(char**args);
+Eextern int backwarddeletechar(char**args);
+Eextern int killwholeline(UNUSED(char**args));
+Eextern int killbuffer(UNUSED(char**args));
+Eextern int backwardkillline(char**args);
+Eextern int gosmacstransposechars(UNUSED(char**args));
+Eextern int transposechars(UNUSED(char**args));
+Eextern int poundinsert(UNUSED(char**args));
+Eextern int acceptline(UNUSED(char**args));
+Eextern int acceptandhold(UNUSED(char**args));
+Eextern int killline(char**args);
+Eextern void regionlines(int*start,int*end);
+Eextern int killregion(UNUSED(char**args));
+Eextern int copyregionaskill(char**args);
+Eextern int yankb;
+Eextern int yanke;
+Eextern int yank(UNUSED(char**args));
+Eextern int viputbefore(UNUSED(char**args));
+Eextern int viputafter(UNUSED(char**args));
+Eextern int putreplaceselection(UNUSED(char**args));
+Eextern int yankpop(UNUSED(char**args));
+Xbracketedstring
+Eextern mod_import_function char*bracketedstring(void);
+Eextern int bracketedpaste(char**args);
+Eextern int overwritemode(UNUSED(char**args));
+Eextern int whatcursorposition(UNUSED(char**args));
+Eextern int undefinedkey(UNUSED(char**args));
+Eextern int quotedinsert(char**args);
+Eextern int digitargument(UNUSED(char**args));
+Eextern int negargument(UNUSED(char**args));
+Eextern int universalargument(char**args);
+Eextern int argumentbase(char**args);
+Eextern int copyprevword(UNUSED(char**args));
+Eextern int copyprevshellword(UNUSED(char**args));
+Eextern int sendbreak(UNUSED(char**args));
+Eextern int quoteregion(UNUSED(char**args));
+Eextern int quoteline(UNUSED(char**args));
+Lstatic ZLE_STRING_T makequote(ZLE_STRING_T str,size_t*len);
+Lstatic void scancompcmd(HashNode hn,UNUSED(int flags));
+Eextern Keymap command_keymap;
+Eextern Thingy executenamedcommand(char*prmt);
+Lstatic char*suffixfunc;
+Eextern int suffixnoinsrem;
+Xsuffixlen
+Eextern mod_import_variable int suffixlen;
+Xaddsuffix
+Eextern mod_import_function void addsuffix(int tp,int flags,ZLE_STRING_T chars,int lenstr,int lensuf);
+Lstatic void addsuffixstring(int tp,int flags,char*chars,int lensuf);
+Xmakesuffix
+Eextern mod_import_function void makesuffix(int n);
+Xmakeparamsuffix
+Eextern mod_import_function void makeparamsuffix(int br,int n);
+Xmakesuffixstr
+Eextern mod_import_function void makesuffixstr(char*f,char*s,int n);
+Xiremovesuffix
+Eextern mod_import_function void iremovesuffix(ZLE_INT_T c,int keep);
+Xfixsuffix
+Eextern mod_import_function void fixsuffix(void);
+E
+E#endif /* !have_Src_Zle_zle_misc_globals */

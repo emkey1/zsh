@@ -1,0 +1,75 @@
+E#ifndef have_Src_Zle_zle_keymap_globals
+E#define have_Src_Zle_zle_keymap_globals
+E
+Eextern Keymap curkeymap;
+Eextern Keymap localkeymap;
+Xcurkeymapname
+Eextern mod_import_variable char*curkeymapname;
+Xkeymapnamtab
+Eextern mod_import_variable HashTable keymapnamtab;
+Eextern char*keybuf;
+Eextern int keybuflen;
+Lstatic void createkeymapnamtab(void);
+Lstatic KeymapName makekeymapnamnode(Keymap keymap);
+Lstatic void emptykeymapnamtab(HashTable ht);
+Lstatic void freekeymapnamnode(HashNode hn);
+Lstatic HashTable newkeytab(char*kmname);
+Lstatic Key makekeynode(Thingy t,char*str);
+Lstatic void freekeynode(HashNode hn);
+Xnewkeymap
+Eextern mod_import_function Keymap newkeymap(Keymap tocopy,char*kmname);
+Lstatic void scancopykeys(HashNode hn,UNUSED(int flags));
+Eextern void deletekeymap(Keymap km);
+Eextern void scankeymap(Keymap km,int sort,KeyScanFunc func,void*magic);
+Lstatic void scankeys(HashNode hn,UNUSED(int flags));
+Xopenkeymap
+Eextern mod_import_function Keymap openkeymap(char*name);
+Xunlinkkeymap
+Eextern mod_import_function int unlinkkeymap(char*name,int ignm);
+Xlinkkeymap
+Eextern mod_import_function int linkkeymap(Keymap km,char*name,int imm);
+Eextern void refkeymap(Keymap km);
+Eextern int unrefkeymap(Keymap km);
+Eextern int selectkeymap(char*name,int fb);
+Xselectlocalmap
+Eextern mod_import_function void selectlocalmap(Keymap m);
+Eextern void reselectkeymap(void);
+Xbindkey
+Eextern mod_import_function int bindkey(Keymap km,const char*seq,Thingy bind,char*str);
+Eextern Thingy keybind(Keymap km,char*seq,char**strp);
+Lstatic int keyisprefix(Keymap km,char*seq);
+Eextern int bin_bindkey(char*name,char**argv,Options ops,UNUSED(int func));
+Lstatic int bin_bindkey_lsmaps(char*name,UNUSED(char*kmname),UNUSED(Keymap km),char**argv,Options ops,UNUSED(char func));
+Lstatic void scanlistmaps(HashNode hn,int list_verbose);
+Lstatic int bin_bindkey_delall(UNUSED(char*name),UNUSED(char*kmname),UNUSED(Keymap km),UNUSED(char**argv),UNUSED(Options ops),UNUSED(char func));
+Lstatic int bin_bindkey_del(char*name,UNUSED(char*kmname),UNUSED(Keymap km),char**argv,UNUSED(Options ops),UNUSED(char func));
+Lstatic int bin_bindkey_link(char*name,UNUSED(char*kmname),Keymap km,char**argv,UNUSED(Options ops),UNUSED(char func));
+Lstatic int bin_bindkey_new(char*name,UNUSED(char*kmname),Keymap km,char**argv,UNUSED(Options ops),UNUSED(char func));
+Lstatic int bin_bindkey_meta(char*name,char*kmname,Keymap km,UNUSED(char**argv),UNUSED(Options ops),UNUSED(char func));
+Lstatic int bin_bindkey_bind(char*name,char*kmname,Keymap km,char**argv,Options ops,char func);
+Lstatic void scanremoveprefix(char*seq,UNUSED(Thingy bind),UNUSED(char*str),void*magic);
+Lstatic int bin_bindkey_list(char*name,char*kmname,Keymap km,char**argv,Options ops,UNUSED(char func));
+Lstatic void scanbindlist(char*seq,Thingy bind,char*str,void*magic);
+Lstatic void bindlistout(struct bindstate*bs);
+Eextern void init_keymaps(void);
+Eextern void cleanup_keymaps(void);
+Lstatic void add_cursor_key(Keymap km,int tccode,Thingy thingy,int defchar);
+Lstatic void default_bindings(void);
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Lstatic ZLE_INT_T getrestchar_keybuf(void);
+E#endif
+L#endif
+Eextern char*getkeymapcmd(Keymap km,Thingy*funcp,char**strp);
+Lstatic void addkeybuf(int c);
+Lstatic int getkeybuf(int w);
+Xungetkeycmd
+Eextern mod_import_function void ungetkeycmd(void);
+Xgetkeycmd
+Eextern mod_import_function Thingy getkeycmd(void);
+Xzlesetkeymap
+Eextern mod_import_function void zlesetkeymap(int mode);
+Xreadcommand
+Eextern mod_import_function int readcommand(UNUSED(char**args));
+E
+E#endif /* !have_Src_Zle_zle_keymap_globals */

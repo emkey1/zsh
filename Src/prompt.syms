@@ -1,0 +1,57 @@
+E#ifndef have_Src_prompt_globals
+E#define have_Src_prompt_globals
+E
+Xtxtcurrentattrs
+Eextern mod_import_variable zattr txtcurrentattrs;
+Xtxtpendingattrs
+Eextern mod_import_variable zattr txtpendingattrs;
+Xtxtunknownattrs
+Eextern mod_import_variable zattr txtunknownattrs;
+Xmemo_term_color
+Eextern mod_import_variable zattr memo_term_color;
+Eextern unsigned char*cmdstack;
+Eextern int cmdsp;
+Xpromptexpand
+Eextern mod_import_function char*promptexpand(char*s,int ns,const char*marker,char*rs,char*Rs);
+Xzattrescape
+Eextern mod_import_function char*zattrescape(zattr atr,int*len);
+Xparsehighlight
+Eextern mod_import_function char*parsehighlight(char*arg,char endchar,zattr*atr,zattr*mask);
+Lstatic int putpromptchar(int doprint,int endchar);
+Lstatic void pputc(char c);
+Lstatic void addbufspc(int need);
+Eextern void stradd(char*d);
+Xtsetcap
+Eextern mod_import_function void tsetcap(int cap,int flags);
+Eextern int putstr(int d);
+Xcountprompt
+Eextern mod_import_function void countprompt(char*str,int*wp,int*hp,int overf);
+Lstatic int prompttrunc(int arg,int truncchar,int doprint,int endchar);
+Eextern void cmdpush(int cmdtok);
+Eextern void cmdpop(void);
+Xapplytextattributes
+Eextern mod_import_function void applytextattributes(int flags);
+Xtreplaceattrs
+Eextern mod_import_function void treplaceattrs(zattr newattrs);
+Xtsetattrs
+Eextern mod_import_function void tsetattrs(zattr newattrs);
+Xtunsetattrs
+Eextern mod_import_function void tunsetattrs(zattr newattrs);
+Xmixattrs
+Eextern mod_import_function zattr mixattrs(zattr primary,zattr mask,zattr secondary);
+Lstatic int truecolor_terminal(void);
+Xmatch_colour
+Eextern mod_import_function zattr match_colour(const char**teststrp,int is_fg,int colour);
+Xmatch_highlight
+Eextern mod_import_function const char*match_highlight(const char*teststr,zattr*on_var,zattr*setmask,int*layer);
+Xoutput_highlight
+Eextern mod_import_function int output_highlight(zattr atr,zattr mask,char*buf);
+Eextern void set_default_colour_sequences(void);
+Xallocate_colour_buffer
+Eextern mod_import_function void allocate_colour_buffer(void);
+Xfree_colour_buffer
+Eextern mod_import_function void free_colour_buffer(void);
+Xset_colour_attribute
+Eextern mod_import_function void set_colour_attribute(zattr atr,int fg_bg,int flags);
+E
+E#endif /* !have_Src_prompt_globals */

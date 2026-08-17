@@ -1,0 +1,27 @@
+E#ifndef have_Src_Zle_zle_word_globals
+E#define have_Src_Zle_zle_word_globals
+E
+Eextern int forwardword(char**args);
+Eextern int wordclass(ZLE_CHAR_T x);
+Eextern int viforwardword(char**args);
+Eextern int viforwardblankword(char**args);
+Eextern int emacsforwardword(char**args);
+Eextern int viforwardblankwordend(char**args);
+Eextern int viforwardwordend(char**args);
+Eextern int backwardword(char**args);
+Eextern int vibackwardword(char**args);
+Eextern int vibackwardblankword(char**args);
+Eextern int vibackwardwordend(char**args);
+Eextern int vibackwardblankwordend(char**args);
+Eextern int emacsbackwardword(char**args);
+Eextern int backwarddeleteword(char**args);
+Eextern int vibackwardkillword(UNUSED(char**args));
+Eextern int backwardkillword(char**args);
+Eextern int upcaseword(UNUSED(char**args));
+Eextern int downcaseword(UNUSED(char**args));
+Eextern int capitalizeword(UNUSED(char**args));
+Eextern int deleteword(char**args);
+Eextern int killword(char**args);
+Eextern int transposewords(UNUSED(char**args));
+E
+E#endif /* !have_Src_Zle_zle_word_globals */

@@ -1,0 +1,49 @@
+E#ifndef have_Src_Zle_compmatch_globals
+E#define have_Src_Zle_compmatch_globals
+E
+Lstatic int cpatterns_same(Cpattern a,Cpattern b);
+Lstatic int cmatchers_same(Cmatcher a,Cmatcher b);
+Xadd_bmatchers
+Eextern mod_import_function void add_bmatchers(Cmatcher m);
+Xupdate_bmatchers
+Eextern mod_import_function void update_bmatchers(void);
+Eextern Cline get_cline(char*l,int ll,char*w,int wl,char*o,int ol,int fl);
+Eextern void free_cline(Cline l);
+Eextern Cline cp_cline(Cline l,int deep);
+Eextern int cline_sublen(Cline l);
+Eextern void cline_setlens(Cline l,int both);
+Eextern void cline_matched(Cline p);
+Eextern Cline revert_cline(Cline p);
+Eextern char*matchbuf;
+Eextern int matchbuflen;
+Eextern int matchbufadded;
+Eextern Cline matchparts;
+Eextern Cline matchlastpart;
+Eextern Cline matchsubs;
+Eextern Cline matchlastsub;
+Lstatic void start_match(void);
+Lstatic void abort_match(void);
+Lstatic void add_match_str(Cmatcher m,char*l,char*w,int wl,int sfx);
+Lstatic void add_match_part(Cmatcher m,char*l,char*w,int wl,char*o,int ol,char*s,int sl,int osl,int sfx);
+Lstatic void add_match_sub(Cmatcher m,char*l,int ll,char*w,int wl);
+Eextern int match_str(char*l,char*w,Brinfo*bpp,int bc,int*rwlp,const int sfx,int test,int part);
+Lstatic int match_parts(char*l,char*w,int n,int part);
+Xcomp_match
+Eextern mod_import_function char*comp_match(char*pfx,char*sfx,char*w,Patprog cp,Cline*clp,int qu,Brinfo*bpl,int bcp,Brinfo*bsl,int bcs,int*exact);
+Xpattern_match1
+Eextern mod_import_function convchar_t pattern_match1(Cpattern p,convchar_t c,int*mtp);
+Xpattern_match_equivalence
+Eextern mod_import_function convchar_t pattern_match_equivalence(Cpattern lp,convchar_t wind,int wmtp,convchar_t wchr);
+Lstatic int pattern_match_restrict(Cpattern p,Cpattern wp,convchar_t*wsc,int wsclen,Cpattern prestrict,ZLE_STRING_T new_line);
+Xpattern_match
+Eextern mod_import_function int pattern_match(Cpattern p,char*s,Cpattern wp,char*ws);
+Eextern Cline bld_parts(char*str,int len,int plen,Cline*lp,Cline*lprem);
+Lstatic int bld_line(Cmatcher mp,ZLE_STRING_T line,char*mword,char*word,int wlen,int sfx);
+Lstatic char*join_strs(int la,char*sa,int lb,char*sb);
+Lstatic int cmp_anchors(Cline o,Cline n,int join);
+Lstatic void join_psfx(Cline ot,Cline nt,Cline*orest,Cline*nrest,int sfx);
+Lstatic void join_mid(Cline o,Cline n);
+Lstatic int sub_join(Cline a,Cline b,Cline e,int anew);
+Eextern Cline join_clines(Cline o,Cline n);
+E
+E#endif /* !have_Src_Zle_compmatch_globals */

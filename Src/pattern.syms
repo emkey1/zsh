@@ -1,0 +1,70 @@
+E#ifndef have_Src_pattern_globals
+E#define have_Src_pattern_globals
+E
+Xzpc_strings
+Eextern mod_import_variable const char*zpc_strings[ZPC_COUNT];
+Xzpc_disables
+Eextern mod_import_variable char zpc_disables[ZPC_COUNT];
+Eextern char zpc_special[ZPC_COUNT];
+Xclear_shiftstate
+Eextern mod_import_function void clear_shiftstate(void);
+Lstatic void patadd(char*add,int ch,long n,int paflags);
+Eextern void patcompstart(void);
+Xpatcompile
+Eextern mod_import_function Patprog patcompile(char*exp,int inflags,char**endexp);
+Lstatic long patcompswitch(int paren,int*flagp);
+Lstatic long patcompbranch(int*flagp,int paren);
+Eextern int patgetglobflags(char**strp,long*assertp,int*ignore);
+Xrange_type
+Eextern mod_import_function int range_type(char*start,int len);
+Xpattern_range_to_string
+Eextern mod_import_function int pattern_range_to_string(char*rangestr,char*outstr);
+Lstatic long patcomppiece(int*flagp,int paren);
+Lstatic long patcompnot(int paren,int*flagsp);
+Lstatic long patnode(long op);
+Lstatic void patinsert(long op,int opnd,char*xtra,int sz);
+Lstatic void pattail(long p,long val);
+Lstatic void patoptail(long p,long val);
+Eextern int errsfound;
+Eextern int forceerrs;
+Eextern void pattrystart(void);
+Lstatic void patmungestring(char**string,int*stringlen,int*unmetalenin);
+Xpatallocstr
+Eextern mod_import_function char*patallocstr(Patprog prog,char*string,int stringlen,int unmetalen,int force,Patstralloc patstralloc);
+Xpattry
+Eextern mod_import_function int pattry(Patprog prog,char*string);
+Xpattrylen
+Eextern mod_import_function int pattrylen(Patprog prog,char*string,int len,int unmetalen,Patstralloc patstralloc,int offset);
+Xpattryrefs
+Eextern mod_import_function int pattryrefs(Patprog prog,char*string,int stringlen,int unmetalenin,Patstralloc patstralloc,int patoffset,int*nump,int*begp,int*endp);
+Eextern int patmatchlen(void);
+Lstatic int patmatch(Upat prog);
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Xmb_patmatchrange
+Eextern mod_import_function int mb_patmatchrange(char*range,wchar_t ch,int zmb_ind,wint_t*indptr,int*mtp);
+Xmb_patmatchindex
+Eextern mod_import_function int mb_patmatchindex(char*range,wint_t ind,wint_t*chr,int*mtp);
+E#endif /* MULTIBYTE_SUPPORT */
+L#endif /* MULTIBYTE_SUPPORT */
+Xpatmatchrange
+Eextern mod_import_function int patmatchrange(char*range,int ch,int*indptr,int*mtp);
+E#ifndef MULTIBYTE_SUPPORT
+L#ifndef MULTIBYTE_SUPPORT
+Xpatmatchindex
+Eextern mod_import_function int patmatchindex(char*range,int ind,int*chr,int*mtp);
+E#endif /* MULTIBYTE_SUPPORT */
+L#endif /* MULTIBYTE_SUPPORT */
+Lstatic int patrepeat(Upat p,char*charstart);
+Xfreepatprog
+Eextern mod_import_function void freepatprog(Patprog prog);
+Eextern int pat_enables(const char*cmd,char**patp,int enable);
+Eextern unsigned int savepatterndisables(void);
+Eextern void startpatternscope(void);
+Eextern void restorepatterndisables(unsigned int disables);
+Eextern void endpatternscope(void);
+Eextern void clearpatterndisables(void);
+Xhaswilds
+Eextern mod_import_function int haswilds(char*str);
+E
+E#endif /* !have_Src_pattern_globals */

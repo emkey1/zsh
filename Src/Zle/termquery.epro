@@ -1,0 +1,17 @@
+/* Generated automatically */
+#ifndef have_Src_Zle_termquery_globals
+#define have_Src_Zle_termquery_globals
+
+extern void query_terminal(void);
+extern char*system_clipget(char clip);
+extern void system_clipput(char clip,char*content,size_t clen);
+extern void start_edit(void);
+extern void end_edit(void);
+extern const char**prompt_markers(void);
+extern void mark_output(int start);
+extern void notify_pwd(void);
+extern void zle_set_cursorform(void);
+extern void free_cursor_forms(void);
+extern void cursor_form(void);
+
+#endif /* !have_Src_Zle_termquery_globals */

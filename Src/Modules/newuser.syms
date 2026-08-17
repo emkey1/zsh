@@ -1,0 +1,12 @@
+E#ifndef have_Src_Modules_newuser_globals
+E#define have_Src_Modules_newuser_globals
+E
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(UNUSED(Module m),UNUSED(char***features));
+Eextern int enables_(UNUSED(Module m),UNUSED(int**enables));
+Lstatic int check_dotfile(const char*dotdir,const char*fname);
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(UNUSED(Module m));
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Modules_newuser_globals */

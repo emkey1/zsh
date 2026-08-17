@@ -1,0 +1,75 @@
+E#ifndef have_Src_glob_globals
+E#define have_Src_glob_globals
+E
+Eextern int badcshglob;
+Eextern int pathpos;
+Eextern char*pathbuf;
+Xglob_pre
+Eextern mod_import_variable char*glob_pre;
+Xglob_suf
+Eextern mod_import_variable char*glob_suf;
+Lstatic void addpath(char*s,int l);
+Lstatic void insert(char*s,int checked);
+Lstatic void scanner(Complist q,int shortcircuit);
+Lstatic Complist parsecomplist(char*instr);
+Lstatic Complist parsepat(char*str);
+Lstatic off_t qgetnum(char**s);
+Lstatic zlong qgetmodespec(char**s);
+Lstatic char*glob_exec_string(char**sp);
+Eextern int checkglobqual(char*str,int sl,int nobareglob,char**sp);
+Eextern void zglob(LinkList list,LinkNode np,int nountok);
+Xfile_type
+Eextern mod_import_function char file_type(mode_t filemode);
+Xhasbraces
+Eextern mod_import_function int hasbraces(char*str);
+Eextern int xpandredir(struct redir*fn,LinkList redirtab);
+Lstatic int bracechardots(char*str,convchar_t*c1p,convchar_t*c2p);
+Xxpandbraces
+Eextern mod_import_function void xpandbraces(LinkList list,LinkNode*np);
+Eextern int matchpat(char*a,char*b);
+Lstatic char*get_match_ret(Imatchdata imd,int b,int e);
+Eextern int getmatch(char**sp,char*pat,int fl,int n,char*replstr);
+Eextern void getmatcharr(char***ap,char*pat,int fl,int n,char*replstr);
+Xgetmatchlist
+Eextern mod_import_function int getmatchlist(char*str,Patprog p,LinkList*repllistp);
+Xfreematchlist
+Eextern mod_import_function void freematchlist(LinkList repllist);
+Lstatic void set_pat_start(Patprog p,int offs);
+Lstatic void set_pat_end(Patprog p,char null_me);
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Lstatic int iincchar(char**tp,int left);
+Lstatic int igetmatch(char**sp,Patprog p,int fl,int n,char*replstr,LinkList*repllistp);
+E#else
+L#else
+Lstatic int igetmatch(char**sp,Patprog p,int fl,int n,char*replstr,LinkList*repllistp);
+E#endif /* MULTIBYTE_SUPPORT */
+L#endif /* MULTIBYTE_SUPPORT */
+Xtokenize
+Eextern mod_import_function void tokenize(char*s);
+Xshtokenize
+Eextern mod_import_function void shtokenize(char*s);
+Lstatic void zshtokenize(char*s,int flags);
+Xremnulargs
+Eextern mod_import_function void remnulargs(char*s);
+Lstatic int qualdev(UNUSED(char*name),struct stat*buf,off_t dv,UNUSED(char*dummy));
+Lstatic int qualnlink(UNUSED(char*name),struct stat*buf,off_t ct,UNUSED(char*dummy));
+Lstatic int qualuid(UNUSED(char*name),struct stat*buf,off_t uid,UNUSED(char*dummy));
+Lstatic int qualgid(UNUSED(char*name),struct stat*buf,off_t gid,UNUSED(char*dummy));
+Lstatic int qualisdev(UNUSED(char*name),struct stat*buf,UNUSED(off_t junk),UNUSED(char*dummy));
+Lstatic int qualisblk(UNUSED(char*name),struct stat*buf,UNUSED(off_t junk),UNUSED(char*dummy));
+Lstatic int qualischr(UNUSED(char*name),struct stat*buf,UNUSED(off_t junk),UNUSED(char*dummy));
+Lstatic int qualisdir(UNUSED(char*name),struct stat*buf,UNUSED(off_t junk),UNUSED(char*dummy));
+Lstatic int qualisfifo(UNUSED(char*name),struct stat*buf,UNUSED(off_t junk),UNUSED(char*dummy));
+Lstatic int qualislnk(UNUSED(char*name),struct stat*buf,UNUSED(off_t junk),UNUSED(char*dummy));
+Lstatic int qualisreg(UNUSED(char*name),struct stat*buf,UNUSED(off_t junk),UNUSED(char*dummy));
+Lstatic int qualissock(UNUSED(char*name),struct stat*buf,UNUSED(off_t junk),UNUSED(char*dummy));
+Lstatic int qualflags(UNUSED(char*name),struct stat*buf,off_t mod,UNUSED(char*dummy));
+Lstatic int qualmodeflags(UNUSED(char*name),struct stat*buf,off_t mod,UNUSED(char*dummy));
+Lstatic int qualiscom(UNUSED(char*name),struct stat*buf,UNUSED(off_t mod),UNUSED(char*dummy));
+Lstatic int qualsize(UNUSED(char*name),struct stat*buf,off_t size,UNUSED(char*dummy));
+Lstatic int qualtime(UNUSED(char*name),struct stat*buf,off_t days,UNUSED(char*dummy));
+Lstatic int qualsheval(char*name,UNUSED(struct stat*buf),UNUSED(off_t days),char*str);
+Lstatic int qualnonemptydir(char*name,struct stat*buf,UNUSED(off_t days),UNUSED(char*str));
+E
+E#endif /* !have_Src_glob_globals */

@@ -1,0 +1,67 @@
+E#ifndef have_Src_Modules_tcp_globals
+E#define have_Src_Modules_tcp_globals
+E
+E#ifndef HAVE_INET_NTOP
+L#ifndef HAVE_INET_NTOP
+Xzsh_inet_ntop
+Eextern mod_import_function char const*zsh_inet_ntop(int af,void const*cp,char*buf,size_t len);
+E#else /* !HAVE_INET_NTOP */
+L#else /* !HAVE_INET_NTOP */
+E# define zsh_inet_ntop inet_ntop
+L# define zsh_inet_ntop inet_ntop
+E#endif /* !HAVE_INET_NTOP */
+L#endif /* !HAVE_INET_NTOP */
+E#ifndef HAVE_INET_ATON
+L#ifndef HAVE_INET_ATON
+Xzsh_inet_aton
+Eextern mod_import_function int zsh_inet_aton(char const*src,struct in_addr*dst);
+E#else /* !HAVE_INET_ATON */
+L#else /* !HAVE_INET_ATON */
+E# define zsh_inet_aton inet_aton
+L# define zsh_inet_aton inet_aton
+E#endif /* !HAVE_INET_ATON */
+L#endif /* !HAVE_INET_ATON */
+E#ifndef HAVE_INET_PTON
+L#ifndef HAVE_INET_PTON
+Xzsh_inet_pton
+Eextern mod_import_function int zsh_inet_pton(int af,char const*src,void*dst);
+E#endif /* !HAVE_INET_PTON */
+L#endif /* !HAVE_INET_PTON */
+E#ifndef HAVE_GETIPNODEBYNAME
+L#ifndef HAVE_GETIPNODEBYNAME
+E# ifndef HAVE_GETHOSTBYNAME2
+L# ifndef HAVE_GETHOSTBYNAME2
+Xzsh_gethostbyname2
+Eextern mod_import_function struct hostent*zsh_gethostbyname2(char const*name,int af);
+E#else /* !HAVE_GETHOSTBYNAME2 */
+L#else /* !HAVE_GETHOSTBYNAME2 */
+E# define zsh_gethostbyname2 gethostbyname2
+L# define zsh_gethostbyname2 gethostbyname2
+E# endif /* !HAVE_GETHOSTBYNAME2 */
+L# endif /* !HAVE_GETHOSTBYNAME2 */
+Xzsh_getipnodebyname
+Eextern mod_import_function struct hostent*zsh_getipnodebyname(char const*name,int af,UNUSED(int flags),int*errorp);
+Xfreehostent
+Eextern mod_import_function void freehostent(UNUSED(struct hostent*ptr));
+E#else /* !HAVE_GETIPNODEBYNAME */
+L#else /* !HAVE_GETIPNODEBYNAME */
+E# define zsh_getipnodebyname getipnodebyname
+L# define zsh_getipnodebyname getipnodebyname
+E#endif /* !HAVE_GETIPNODEBYNAME */
+L#endif /* !HAVE_GETIPNODEBYNAME */
+Xtcp_socket
+Eextern mod_import_function Tcp_session tcp_socket(int domain,int type,int protocol,int ztflags);
+Xtcp_shutdown
+Eextern mod_import_function int tcp_shutdown(Tcp_session sess);
+Xtcp_close
+Eextern mod_import_function int tcp_close(Tcp_session sess);
+Xtcp_connect
+Eextern mod_import_function int tcp_connect(Tcp_session sess,char*addrp,struct hostent*zhost,int d_port);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Modules_tcp_globals */

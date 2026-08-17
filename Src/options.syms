@@ -1,0 +1,35 @@
+E#ifndef have_Src_options_globals
+E#define have_Src_options_globals
+E
+Xemulation
+Eextern mod_import_variable int emulation;
+Xsticky
+Eextern mod_import_variable Emulation_options sticky;
+Xopts
+Eextern mod_import_variable char opts[OPT_SIZE];
+Xoptiontab
+Eextern mod_import_variable HashTable optiontab;
+Lstatic void printoptionnode(HashNode hn,int set);
+Eextern void createoptiontable(void);
+Lstatic char*setemulate_opts;
+Lstatic void setemulate(HashNode hn,int fully);
+Eextern void installemulation(int new_emulation,char*new_opts);
+Eextern void emulate(const char*zsh_name,int fully,int*new_emulation,char*new_opts);
+Lstatic void setoption(HashNode hn,int value);
+Eextern int bin_setopt(char*nam,char**args,UNUSED(Options ops),int isun);
+Xoptlookup
+Eextern mod_import_function int optlookup(char const*name);
+Eextern int optlookupc(convchar_t c);
+Xdosetopt
+Eextern mod_import_function int dosetopt(int optno,int value,int force,char*new_opts);
+Eextern char*dashgetfn(UNUSED(Param pm));
+Eextern void printoptionstates(int hadplus);
+Lstatic void printoptionnodestate(HashNode hn,int hadplus);
+Eextern void printoptionlist(void);
+Lstatic void printoptionlist_printoption(HashNode hn,UNUSED(int ignored));
+Lstatic void printoptionlist_printequiv(int optno);
+Lstatic char*print_emulate_opts;
+Lstatic void print_emulate_option(HashNode hn,int fully);
+Eextern void list_emulate_options(char*cmdopts,int fully);
+E
+E#endif /* !have_Src_options_globals */

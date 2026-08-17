@@ -1,0 +1,17 @@
+E#ifndef have_Src_Zle_termquery_globals
+E#define have_Src_Zle_termquery_globals
+E
+Eextern void query_terminal(void);
+Eextern char*system_clipget(char clip);
+Eextern void system_clipput(char clip,char*content,size_t clen);
+Lstatic int extension_enabled(const char*prefix,const char*ext,unsigned plen,int def);
+Eextern void start_edit(void);
+Eextern void end_edit(void);
+Eextern const char**prompt_markers(void);
+Eextern void mark_output(int start);
+Eextern void notify_pwd(void);
+Eextern void zle_set_cursorform(void);
+Eextern void free_cursor_forms(void);
+Eextern void cursor_form(void);
+E
+E#endif /* !have_Src_Zle_termquery_globals */

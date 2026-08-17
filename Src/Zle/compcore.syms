@@ -1,0 +1,170 @@
+E#ifndef have_Src_Zle_compcore_globals
+E#define have_Src_Zle_compcore_globals
+E
+Eextern int useexact;
+Eextern int useline;
+Eextern int uselist;
+Eextern int forcelist;
+Eextern int startauto;
+Xiforcemenu
+Eextern mod_import_variable int iforcemenu;
+Xdolastprompt
+Eextern mod_import_variable int dolastprompt;
+Xoldlist
+Eextern mod_import_variable int oldlist;
+Xoldins
+Eextern mod_import_variable int oldins;
+Eextern int origlpre;
+Eextern int origlsuf;
+Eextern int lenchanged;
+Eextern int movetoend;
+Xinsmnum
+Eextern mod_import_variable int insmnum;
+Xinsspace
+Eextern mod_import_variable int insspace;
+Xminfo
+Eextern mod_import_variable struct menuinfo minfo;
+Xmenuacc
+Eextern mod_import_variable int menuacc;
+Eextern int useqbr;
+Eextern int brpcs;
+Eextern int brscs;
+Xispar
+Eextern mod_import_variable int ispar;
+Xlinwhat
+Eextern mod_import_variable int linwhat;
+Eextern char*parpre;
+Eextern int parflags;
+Xmflags
+Eextern mod_import_variable int mflags;
+Eextern int parq;
+Eextern int eparq;
+Xipre
+Eextern mod_import_variable char*ipre;
+Xripre
+Eextern mod_import_variable char*ripre;
+Xisuf
+Eextern mod_import_variable char*isuf;
+Xmatches
+Eextern mod_import_variable LinkList matches;
+Eextern LinkList fmatches;
+Xlastmatches
+Eextern mod_import_variable Cmgroup lastmatches;
+Xpmatches
+Eextern mod_import_variable Cmgroup pmatches;
+Xamatches
+Eextern mod_import_variable Cmgroup amatches;
+Xlmatches
+Eextern mod_import_variable Cmgroup lmatches;
+Xlastlmatches
+Eextern mod_import_variable Cmgroup lastlmatches;
+Xhasoldlist
+Eextern mod_import_variable int hasoldlist;
+Xhasperm
+Eextern mod_import_variable int hasperm;
+Eextern int hasallmatch;
+Xnewmatches
+Eextern mod_import_variable int newmatches;
+Xpermmnum
+Eextern mod_import_variable int permmnum;
+Xpermgnum
+Eextern mod_import_variable int permgnum;
+Xlastpermmnum
+Eextern mod_import_variable int lastpermmnum;
+Xlastpermgnum
+Eextern mod_import_variable int lastpermgnum;
+Xnmatches
+Eextern mod_import_variable int nmatches;
+Xsmatches
+Eextern mod_import_variable int smatches;
+Xdiffmatches
+Eextern mod_import_variable int diffmatches;
+Xnmessages
+Eextern mod_import_variable int nmessages;
+Xonlyexpl
+Eextern mod_import_variable int onlyexpl;
+Xlistdat
+Eextern mod_import_variable struct cldata listdat;
+Xispattern
+Eextern mod_import_variable int ispattern;
+Xhaspattern
+Eextern mod_import_variable int haspattern;
+Xhasmatched
+Eextern mod_import_variable int hasmatched;
+Xhasunmatched
+Eextern mod_import_variable int hasunmatched;
+Eextern Cmgroup mgroup;
+Xmnum
+Eextern mod_import_variable int mnum;
+Xunambig_mnum
+Eextern mod_import_variable int unambig_mnum;
+Eextern int maxmlen;
+Eextern int minmlen;
+Eextern LinkList expls;
+Xcurexpl
+Eextern mod_import_variable Cexpl curexpl;
+Xmstack
+Eextern mod_import_variable Cmlist mstack;
+Xbmatchers
+Eextern mod_import_variable Cmlist bmatchers;
+Xmatchers
+Eextern mod_import_variable LinkList matchers;
+Xfreecl
+Eextern mod_import_variable Cline freecl;
+Xainfo
+Eextern mod_import_variable Aminfo ainfo;
+Xfainfo
+Eextern mod_import_variable Aminfo fainfo;
+Xcompheap
+Eextern mod_import_variable Heap compheap;
+Xallccs
+Eextern mod_import_variable LinkList allccs;
+Eextern int fromcomp;
+Xlastend
+Eextern mod_import_variable int lastend;
+Eextern int do_completion(UNUSED(Hookdef dummy),Compldat dat);
+Eextern int before_complete(UNUSED(Hookdef dummy),int*lst);
+Eextern int after_complete(UNUSED(Hookdef dummy),int*dat);
+Lstatic void callcompfunc(char*s,char*fn);
+Lstatic int makecomplist(char*s,int incmd,int lst);
+Xmultiquote
+Eextern mod_import_function char*multiquote(char*s,int ign);
+Xtildequote
+Eextern mod_import_function char*tildequote(char*s,int ign);
+Xcheck_param
+Eextern mod_import_function char*check_param(char*s,int set,int test);
+Xrembslash
+Eextern mod_import_function char*rembslash(char*s);
+Xremsquote
+Eextern mod_import_function int remsquote(char*s);
+Xctokenize
+Eextern mod_import_function char*ctokenize(char*p);
+Xcomp_str
+Eextern mod_import_function char*comp_str(int*ipl,int*pl,int untok);
+Xcomp_quoting_string
+Eextern mod_import_function char*comp_quoting_string(int stype);
+Eextern int set_comp_sep(void);
+Xset_list_array
+Eextern mod_import_function void set_list_array(char*name,LinkList l);
+Xget_user_var
+Eextern mod_import_function char**get_user_var(char*nam);
+Eextern int addmatches(Cadata dat,char**argv);
+Xadd_match_data
+Eextern mod_import_function Cmatch add_match_data(int alt,char*str,char*orig,Cline line,char*ipre,char*ripre,char*isuf,char*pre,char*prpre,char*ppre,Cline pline,char*psuf,Cline sline,char*suf,int flags,int exact);
+Xbegcmgroup
+Eextern mod_import_function void begcmgroup(char*n,int flags);
+Xendcmgroup
+Eextern mod_import_function void endcmgroup(char**ylist);
+Xaddexpl
+Eextern mod_import_function void addexpl(int always);
+Lstatic int matchcmp(Cmatch*a,Cmatch*b);
+Lstatic int matcheq(Cmatch a,Cmatch b);
+Lstatic Cmatch*makearray(LinkList l,int type,int flags,int*np,int*nlp,int*llp);
+Lstatic Cmatch dupmatch(Cmatch m,int nbeg,int nend);
+Xpermmatches
+Eextern mod_import_function int permmatches(int last);
+Lstatic void freematch(Cmatch m,int nbeg,int nend);
+Xfreematches
+Eextern mod_import_function void freematches(Cmgroup g,int cm);
+E
+E#endif /* !have_Src_Zle_compcore_globals */

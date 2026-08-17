@@ -1,0 +1,156 @@
+E#ifndef have_Src_module_globals
+E#define have_Src_module_globals
+E
+Eextern LinkList linkedmodules;
+Eextern char**module_path;
+Xmodulestab
+Eextern mod_import_variable HashTable modulestab;
+Eextern HashTable newmoduletable(int size,char const*name);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(UNUSED(Module m),UNUSED(char***features));
+Eextern int enables_(UNUSED(Module m),UNUSED(int**enables));
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(UNUSED(Module m));
+Eextern int finish_(UNUSED(Module m));
+Eextern void register_module(const char*n,Module_void_func setup,Module_features_func features,Module_enables_func enables,Module_void_func boot,Module_void_func cleanup,Module_void_func finish);
+Eextern Linkedmod module_linked(char const*name);
+Lstatic int addbuiltin(Builtin b);
+Lstatic int add_autobin(const char*module,const char*bnam,int flags);
+Eextern int deletebuiltin(const char*nam);
+Lstatic int del_autobin(UNUSED(const char*module),const char*bnam,int flags);
+Lstatic int setbuiltins(char const*nam,Builtin binl,int size,int*e);
+Xaddbuiltins
+Eextern mod_import_function int addbuiltins(char const*nam,Builtin binl,int size);
+Eextern FuncWrap wrappers;
+Xaddwrapper
+Eextern mod_import_function int addwrapper(Module m,FuncWrap w);
+Xdeletewrapper
+Eextern mod_import_function int deletewrapper(Module m,FuncWrap w);
+Xcondtab
+Eextern mod_import_variable Conddef condtab;
+Eextern Conddef getconddef(int inf,const char*name,int autol);
+Lstatic int addconddef(Conddef c);
+Eextern int deleteconddef(Conddef c);
+Lstatic int setconddefs(char const*nam,Conddef c,int size,int*e);
+Lstatic int add_autocond(const char*module,const char*cnam,int flags);
+Lstatic int del_autocond(UNUSED(const char*modnam),const char*cnam,int flags);
+Eextern Hookdef hooktab;
+Eextern Hookdef gethookdef(const char*n);
+Eextern int addhookdef(Hookdef h);
+Xaddhookdefs
+Eextern mod_import_function int addhookdefs(Module m,Hookdef h,int size);
+Eextern int deletehookdef(Hookdef h);
+Xdeletehookdefs
+Eextern mod_import_function int deletehookdefs(UNUSED(Module m),Hookdef h,int size);
+Eextern int addhookdeffunc(Hookdef h,Hookfn f);
+Xaddhookfunc
+Eextern mod_import_function int addhookfunc(char*n,Hookfn f);
+Eextern int deletehookdeffunc(Hookdef h,Hookfn f);
+Xdeletehookfunc
+Eextern mod_import_function int deletehookfunc(const char*n,Hookfn f);
+Xrunhookdef
+Eextern mod_import_function int runhookdef(Hookdef h,void*d);
+Eextern int addparamdef(Paramdef d);
+Eextern int deleteparamdef(Paramdef d);
+Lstatic int setparamdefs(char const*nam,Paramdef d,int size,int*e);
+Lstatic int add_autoparam(const char*module,const char*pnam,int flags);
+Lstatic int del_autoparam(UNUSED(const char*modnam),const char*pnam,int flags);
+Eextern MathFunc mathfuncs;
+Eextern void removemathfunc(MathFunc previous,MathFunc current);
+Eextern MathFunc getmathfunc(const char*name,int autol);
+Lstatic int addmathfunc(MathFunc f);
+Eextern int deletemathfunc(MathFunc f);
+Lstatic int setmathfuncs(char const*nam,MathFunc f,int size,int*e);
+Lstatic int add_automathfunc(const char*module,const char*fnam,int flags);
+Lstatic int del_automathfunc(UNUSED(const char*modnam),const char*fnam,int flags);
+E#ifdef DYNAMIC
+L#ifdef DYNAMIC
+E#ifdef AIXDYNAMIC
+L#ifdef AIXDYNAMIC
+E#else
+L#else
+E#ifdef HPUX10DYNAMIC
+L#ifdef HPUX10DYNAMIC
+E#endif
+L#endif
+E#endif /* !AIXDYNAMIC */
+L#endif /* !AIXDYNAMIC */
+Lstatic void*try_load_module(char const*name);
+Lstatic void*do_load_module(char const*name,int silent);
+E#else /* !DYNAMIC */
+L#else /* !DYNAMIC */
+Lstatic void*do_load_module(char const*name,int silent);
+E#endif /* !DYNAMIC */
+L#endif /* !DYNAMIC */
+Lstatic Module find_module(const char*name,int flags,const char**namep);
+Lstatic void delete_module(Module m);
+Xmodule_loaded
+Eextern mod_import_function int module_loaded(const char*name);
+E#ifdef DYNAMIC
+L#ifdef DYNAMIC
+E#ifdef AIXDYNAMIC
+L#ifdef AIXDYNAMIC
+Lstatic int dyn_setup_module(Module m);
+Lstatic int dyn_features_module(Module m,char***features);
+Lstatic int dyn_enables_module(Module m,int**enables);
+Lstatic int dyn_boot_module(Module m);
+Lstatic int dyn_cleanup_module(Module m);
+Lstatic int dyn_finish_module(Module m);
+E#else
+L#else
+Lstatic int dyn_setup_module(Module m);
+Lstatic int dyn_features_module(Module m,char***features);
+Lstatic int dyn_enables_module(Module m,int**enables);
+Lstatic int dyn_boot_module(Module m);
+Lstatic int dyn_cleanup_module(Module m);
+Lstatic int dyn_finish_module(Module m);
+E#endif /* !AIXDYNAMIC */
+L#endif /* !AIXDYNAMIC */
+Lstatic int setup_module(Module m);
+Lstatic int features_module(Module m,char***features);
+Lstatic int enables_module(Module m,int**enables);
+Lstatic int boot_module(Module m);
+Lstatic int cleanup_module(Module m);
+Lstatic int finish_module(Module m);
+E#else /* !DYNAMIC */
+L#else /* !DYNAMIC */
+Lstatic int setup_module(Module m);
+Lstatic int features_module(Module m,char***features);
+Lstatic int enables_module(Module m,int**enables);
+Lstatic int boot_module(Module m);
+Lstatic int cleanup_module(Module m);
+Lstatic int finish_module(Module m);
+E#endif /* !DYNAMIC */
+L#endif /* !DYNAMIC */
+Lstatic int do_module_features(Module m,Feature_enables enablesarr,int flags);
+Lstatic int do_boot_module(Module m,Feature_enables enablesarr,int silent);
+Lstatic int do_cleanup_module(Module m);
+Lstatic int modname_ok(char const*p);
+Xload_module
+Eextern mod_import_function int load_module(char const*name,Feature_enables enablesarr,int silent);
+Xrequire_module
+Eextern mod_import_function int require_module(const char*module,Feature_enables features,int silent);
+Eextern void add_dep(const char*name,char*from);
+Lstatic void autoloadscan(HashNode hn,int printflags);
+Eextern int bin_zmodload(char*nam,char**args,Options ops,UNUSED(int func));
+Lstatic int bin_zmodload_alias(char*nam,char**args,Options ops);
+Lstatic int bin_zmodload_exist(UNUSED(char*nam),char**args,Options ops);
+Lstatic int bin_zmodload_dep(UNUSED(char*nam),char**args,Options ops);
+Lstatic int bin_zmodload_auto(char*nam,char**args,Options ops);
+Eextern int unload_module(Module m);
+Eextern int unload_named_module(char*modname,char*nam,int silent);
+Lstatic int bin_zmodload_load(char*nam,char**args,Options ops);
+Lstatic int bin_zmodload_features(const char*nam,char**args,Options ops);
+Xfeaturesarray
+Eextern mod_import_function char**featuresarray(UNUSED(Module m),Features f);
+Xgetfeatureenables
+Eextern mod_import_function int*getfeatureenables(UNUSED(Module m),Features f);
+Xsetfeatureenables
+Eextern mod_import_function int setfeatureenables(Module m,Features f,int*e);
+Xhandlefeatures
+Eextern mod_import_function int handlefeatures(Module m,Features f,int**enables);
+Xensurefeature
+Eextern mod_import_function int ensurefeature(const char*modname,const char*prefix,const char*feature);
+Eextern int autofeatures(const char*cmdnam,const char*module,char**features,int prefchar,int defflags);
+E
+E#endif /* !have_Src_module_globals */

@@ -1,0 +1,60 @@
+E#ifndef have_Src_Zle_zle_hist_globals
+E#define have_Src_Zle_zle_hist_globals
+E
+Eextern int lastcol;
+Eextern int histline;
+Eextern char*previous_search;
+Eextern int previous_search_len;
+Eextern char*previous_aborted_search;
+Eextern Keymap isearch_keymap;
+Eextern int have_edits;
+Eextern void remember_edits(void);
+Eextern void forget_edits(void);
+Eextern int uphistory(UNUSED(char**args));
+Eextern int upline(char**args);
+Eextern int uplineorhistory(char**args);
+Eextern int viuplineorhistory(char**args);
+Eextern int uplineorsearch(char**args);
+Eextern int downline(char**args);
+Eextern int downlineorhistory(char**args);
+Eextern int vidownlineorhistory(char**args);
+Eextern int downlineorsearch(char**args);
+Eextern int acceptlineanddownhistory(UNUSED(char**args));
+Eextern int downhistory(UNUSED(char**args));
+Eextern int historysearchbackward(char**args);
+Eextern int historysearchforward(char**args);
+Eextern int beginningofbufferorhistory(char**args);
+Eextern int beginningofhistory(UNUSED(char**args));
+Eextern int endofbufferorhistory(char**args);
+Eextern int endofhistory(UNUSED(char**args));
+Eextern int insertlastword(char**args);
+Eextern void zle_setline(Histent he);
+Eextern int setlocalhistory(UNUSED(char**args));
+Eextern int zle_goto_hist(int ev,int n,int skipdups);
+Eextern int pushline(UNUSED(char**args));
+Eextern int pushlineoredit(char**args);
+Eextern int pushinput(char**args);
+Eextern int zgetline(UNUSED(char**args));
+Eextern int historyincrementalsearchbackward(char**args);
+Eextern int historyincrementalsearchforward(char**args);
+Eextern int historyincrementalpatternsearchbackward(char**args);
+Eextern int historyincrementalpatternsearchforward(char**args);
+Eextern void free_isrch_spots(void);
+Lstatic void set_isrch_spot(int num,int hl,int pos,int pat_hl,int pat_pos,int end_pos,int cs,int len,int dir,int nomatch);
+Lstatic void get_isrch_spot(int num,int*hlp,int*posp,int*pat_hlp,int*pat_posp,int*end_posp,int*csp,int*lenp,int*dirp,int*nomatch);
+Eextern int isearch_active;
+Eextern int isearch_startpos;
+Eextern int isearch_endpos;
+Lstatic int doisearch(char**args,int dir,int pattern);
+Eextern int acceptandinfernexthistory(char**args);
+Eextern int infernexthistory(char**args);
+Eextern int vifetchhistory(UNUSED(char**args));
+Lstatic int getvisrchstr(void);
+Eextern int vihistorysearchforward(char**args);
+Eextern int vihistorysearchbackward(char**args);
+Eextern int virepeatsearch(UNUSED(char**args));
+Eextern int virevrepeatsearch(char**args);
+Eextern int historybeginningsearchbackward(char**args);
+Eextern int historybeginningsearchforward(char**args);
+E
+E#endif /* !have_Src_Zle_zle_hist_globals */

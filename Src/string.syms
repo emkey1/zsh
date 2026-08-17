@@ -1,0 +1,33 @@
+E#ifndef have_Src_string_globals
+E#define have_Src_string_globals
+E
+Xdupstring
+Eextern mod_import_function char*dupstring(const char*s);
+Xdupstring_wlen
+Eextern mod_import_function char*dupstring_wlen(const char*s,unsigned len);
+Xztrdup
+Eextern mod_import_function char*ztrdup(const char*s);
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Xwcs_ztrdup
+Eextern mod_import_function wchar_t*wcs_ztrdup(const wchar_t*s);
+E#endif /* MULTIBYTE_SUPPORT */
+L#endif /* MULTIBYTE_SUPPORT */
+Xtricat
+Eextern mod_import_function char*tricat(char const*s1,char const*s2,char const*s3);
+Xzhtricat
+Eextern mod_import_function char*zhtricat(char const*s1,char const*s2,char const*s3);
+Xdyncat
+Eextern mod_import_function char*dyncat(const char*s1,const char*s2);
+Xbicat
+Eextern mod_import_function char*bicat(const char*s1,const char*s2);
+Xdupstrpfx
+Eextern mod_import_function char*dupstrpfx(const char*s,int len);
+Xztrduppfx
+Eextern mod_import_function char*ztrduppfx(const char*s,int len);
+Xappstr
+Eextern mod_import_function char*appstr(char*base,char const*append);
+Xstrend
+Eextern mod_import_function char*strend(char*str);
+E
+E#endif /* !have_Src_string_globals */

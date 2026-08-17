@@ -1,0 +1,68 @@
+E#ifndef have_Src_signals_globals
+E#define have_Src_signals_globals
+E
+Xsigtrapped
+Eextern mod_import_variable int*sigtrapped;
+Xsiglists
+Eextern mod_import_variable Eprog*siglists;
+Xnsigtrapped
+Eextern mod_import_variable volatile int nsigtrapped;
+Eextern int in_exit_trap;
+Lstatic int exit_trap_posix;
+Xqueueing_enabled
+Eextern mod_import_variable volatile int queueing_enabled;
+Xqueue_front
+Eextern mod_import_variable volatile int queue_front;
+Xqueue_rear
+Eextern mod_import_variable volatile int queue_rear;
+Xsignal_queue
+Eextern mod_import_variable int signal_queue[MAX_QUEUE_SIZE];
+Xsignal_mask_queue
+Eextern mod_import_variable sigset_t signal_mask_queue[MAX_QUEUE_SIZE];
+Xqueue_in
+Eextern mod_import_variable volatile int queue_in;
+Lstatic volatile int trap_queueing_enabled;
+Lstatic volatile int trap_queue_front;
+Lstatic volatile int trap_queue_rear;
+Lstatic int trap_queue[MAX_QUEUE_SIZE];
+Xinstall_handler
+Eextern mod_import_function void install_handler(int sig);
+Xintr
+Eextern mod_import_function void intr(void);
+Xholdintr
+Eextern mod_import_function void holdintr(void);
+Xnoholdintr
+Eextern mod_import_function void noholdintr(void);
+Xsignal_mask
+Eextern mod_import_function sigset_t signal_mask(int sig);
+Xsignal_block
+Eextern mod_import_function sigset_t signal_block(sigset_t set);
+Xsignal_unblock
+Eextern mod_import_function sigset_t signal_unblock(sigset_t set);
+Xsignal_setmask
+Eextern mod_import_function sigset_t signal_setmask(sigset_t set);
+Eextern int signal_suspend(UNUSED(int sig),int wait_cmd);
+Eextern int last_signal;
+Eextern void wait_for_processes(void);
+Xzhandler
+Eextern mod_import_function void zhandler(int sig);
+Eextern void killrunjobs(int from_signal);
+Eextern int killjb(Job jn,int sig);
+Xsettrap
+Eextern mod_import_function int settrap(int sig,Eprog l,int flags);
+Eextern void unsettrap(int sig);
+Eextern HashNode removetrap(int sig);
+Eextern void starttrapscope(void);
+Eextern void endtrapscope(void);
+Lstatic int handletrap(int sig);
+Eextern void queue_traps(int wait_cmd);
+Eextern void unqueue_traps(void);
+Eextern volatile int intrap;
+Eextern volatile int trapisfunc;
+Eextern volatile int traplocallevel;
+Lstatic void dotrapargs(int sig,int*sigtr,void*sigfn);
+Eextern void dotrap(int sig);
+Eextern int rtsigno(const char*signame);
+Eextern char*rtsigname(int signo,int alt);
+E
+E#endif /* !have_Src_signals_globals */

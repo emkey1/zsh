@@ -1,0 +1,6 @@
+E#ifndef have_Src_Modules_errnames_globals
+E#define have_Src_Modules_errnames_globals
+E
+Eextern const char*sys_errnames[ERRCOUNT+1];
+E
+E#endif /* !have_Src_Modules_errnames_globals */

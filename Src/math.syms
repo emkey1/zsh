@@ -1,0 +1,29 @@
+E#ifndef have_Src_math_globals
+E#define have_Src_math_globals
+E
+Eextern int noeval;
+Xzero_mnumber
+Eextern mod_import_variable mnumber zero_mnumber;
+Eextern mnumber lastmathval;
+Eextern int lastbase;
+Eextern int outputradix;
+Eextern int outputunderscore;
+Eextern int isinf(double x);
+Eextern int isnan(double x);
+Lstatic int zzlex(void);
+Lstatic void push(mnumber val,char*lval,int getme);
+Lstatic mnumber pop(int noget);
+Lstatic mnumber getcvar(char*s);
+Lstatic mnumber setmathvar(struct mathvalue*mvp,mnumber v);
+Lstatic mnumber callmathfunc(char*o);
+Lstatic int notzero(mnumber a);
+Lstatic void bop(int tk);
+Xmatheval
+Eextern mod_import_function mnumber matheval(char*s);
+Xmathevali
+Eextern mod_import_function zlong mathevali(char*s);
+Eextern zlong mathevalarg(char*s,char**ss);
+Lstatic void checkunary(int mtokc,char*mptr);
+Lstatic void mathparse(int pc);
+E
+E#endif /* !have_Src_math_globals */

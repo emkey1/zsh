@@ -1,0 +1,124 @@
+E#ifndef have_Src_hist_globals
+E#define have_Src_hist_globals
+E
+Xhgetc
+Eextern mod_import_variable int(*hgetc)(void);
+Eextern void(*hungetc)(int);
+Eextern void(*hwaddc)(int);
+Eextern void(*hwbegin)(int);
+Eextern void(*hwabort)(void);
+Eextern void(*hwend)(void);
+Eextern void(*addtoline)(int);
+Xstophist
+Eextern mod_import_variable int stophist;
+Xexpanding
+Eextern mod_import_variable int expanding;
+Xexcs
+Eextern mod_import_variable int excs;
+Xexlast
+Eextern mod_import_variable int exlast;
+Xcurhist
+Eextern mod_import_variable zlong curhist;
+Eextern struct histent curline;
+Eextern zlong histlinect;
+Eextern HashTable histtab;
+Xhist_ring
+Eextern mod_import_variable Histent hist_ring;
+Eextern zlong histsiz;
+Eextern zlong savehistsiz;
+Eextern int histdone;
+Eextern int histactive;
+Eextern int hist_ignore_all_dups;
+Xhist_skip_flags
+Eextern mod_import_variable int hist_skip_flags;
+Eextern short*chwords;
+Eextern int chwordlen;
+Eextern int chwordpos;
+Eextern char*hsubl;
+Eextern char*hsubr;
+Eextern int hsubpatopt;
+Xhptr
+Eextern mod_import_variable char*hptr;
+Xchline
+Eextern mod_import_variable char*chline;
+Xzle_chline
+Eextern mod_import_variable char*zle_chline;
+Eextern int qbang;
+Eextern int hlinesz;
+Eextern void hist_context_save(struct hist_stack*hs,int toplevel);
+Eextern void hist_context_restore(const struct hist_stack*hs,int toplevel);
+Eextern void hist_in_word(int yesno);
+Eextern int hist_is_in_word(void);
+Eextern void iaddtoline(int c);
+Lstatic void safeinungetc(int c);
+Eextern void herrflush(void);
+Lstatic int getsubsargs(UNUSED(char*subline),int*gbalp,int*cflagp);
+Lstatic int getargc(Histent ehist);
+Lstatic int substfailed(void);
+Lstatic int histsubchar(int c);
+Xstrinbeg
+Eextern mod_import_function void strinbeg(int dohist);
+Xstrinend
+Eextern mod_import_function void strinend(void);
+Xhbegin
+Eextern mod_import_function void hbegin(int dohist);
+Eextern void histreduceblanks(void);
+Eextern void histremovedups(void);
+Xaddhistnum
+Eextern mod_import_function zlong addhistnum(zlong hl,int n,int xflags);
+Xmovehistent
+Eextern mod_import_function Histent movehistent(Histent he,int n,int xflags);
+Xup_histent
+Eextern mod_import_function Histent up_histent(Histent he);
+Xdown_histent
+Eextern mod_import_function Histent down_histent(Histent he);
+Xgethistent
+Eextern mod_import_function Histent gethistent(zlong ev,int nearmatch);
+Eextern Histent prepnexthistent(void);
+Xhend
+Eextern mod_import_function int hend(Eprog prog);
+Eextern void ihwbegin(int offset);
+Eextern void ihwabort(void);
+Eextern void ihwend(void);
+Eextern void histbackword(void);
+Lstatic void hwget(char**startptr);
+Eextern void hwrep(char*rep);
+Xhgetline
+Eextern mod_import_function char*hgetline(void);
+Lstatic int getargspec(int argc,int marg,int evset);
+Lstatic zlong hconsearch(char*str,int*marg);
+Eextern zlong hcomsearch(char*str);
+Eextern int chabspath(char**junkptr);
+Eextern int chrealpath(char**junkptr,char mode,int use_heap);
+Eextern int remtpath(char**junkptr,int count);
+Eextern int remtext(char**junkptr);
+Eextern int rembutext(char**junkptr);
+Xremlpaths
+Eextern mod_import_function int remlpaths(char**junkptr,int count);
+Eextern char*casemodify(char*str,int how);
+Eextern int subst(char**strptr,char*in,char*out,int gbal,int forcepat);
+Lstatic char*convamps(char*out,char*in,int inlen);
+Lstatic void checkcurline(Histent he);
+Xquietgethist
+Eextern mod_import_function Histent quietgethist(int ev);
+Lstatic Histent gethist(int ev);
+Lstatic char*getargs(Histent elist,int arg1,int arg2);
+Lstatic int quote(char**tr);
+Lstatic int quotebreak(char**tr);
+Lstatic char*hdynread2(int stop);
+Eextern void inithist(void);
+Eextern void resizehistents(void);
+Eextern void readhistfile(char*fn,int err,int readflags);
+Eextern void savehistfile(char*fn,int err,int writeflags);
+Eextern int lockhistfile(char*fn,int keep_trying);
+Eextern void unlockhistfile(char*fn);
+Eextern int histfileIsLocked(void);
+Xbufferwords
+Eextern mod_import_function LinkList bufferwords(LinkList list,char*buf,int*index,int flags);
+Xhistsplitwords
+Eextern mod_import_function void histsplitwords(char*lineptr,short**wordsp,int*nwordsp,int*nwordposp,int uselex);
+Eextern int pushhiststack(char*hf,zlong hs,zlong shs,int level);
+Eextern int pophiststack(void);
+Eextern int saveandpophiststack(int pop_through,int writeflags);
+E
+E#endif /* !have_Src_hist_globals */

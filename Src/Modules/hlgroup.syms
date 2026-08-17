@@ -1,0 +1,18 @@
+E#ifndef have_Src_Modules_hlgroup_globals
+E#define have_Src_Modules_hlgroup_globals
+E
+Lstatic char*convertattr(char*attrstr,int sgr);
+Lstatic HashNode getgroup(const char*name,int sgr);
+Lstatic void scangroup(ScanFunc func,int flags,int sgr);
+Lstatic HashNode getpmesc(UNUSED(HashTable ht),const char*name);
+Lstatic void scanpmesc(UNUSED(HashTable ht),ScanFunc func,int flags);
+Lstatic HashNode getpmsgr(UNUSED(HashTable ht),const char*name);
+Lstatic void scanpmsgr(UNUSED(HashTable ht),ScanFunc func,int flags);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Modules_hlgroup_globals */

@@ -1,0 +1,31 @@
+E#ifndef have_Src_Modules_files_globals
+E#define have_Src_Modules_files_globals
+E
+Lstatic int ask(void);
+Lstatic int bin_sync(UNUSED(char*nam),UNUSED(char**args),UNUSED(Options ops),UNUSED(int func));
+Lstatic int bin_mkdir(char*nam,char**args,Options ops,UNUSED(int func));
+Lstatic int domkdir(char*nam,char*path,mode_t mode,int p);
+Lstatic int bin_rmdir(char*nam,char**args,UNUSED(Options ops),UNUSED(int func));
+Lstatic int bin_ln(char*nam,char**args,Options ops,int func);
+Lstatic int domove(char*nam,MoveFunc movefn,char*p,char*q,int flags);
+Lstatic int recursivecmd(char*nam,int opt_noerr,int opt_recurse,int opt_safe,char**args,RecurseFunc dirpre_func,RecurseFunc dirpost_func,RecurseFunc leaf_func,void*magic);
+Lstatic int recursivecmd_doone(struct recursivecmd const*reccmd,char*arg,char*rp,struct dirsav*ds,int first);
+Lstatic int recursivecmd_dorec(struct recursivecmd const*reccmd,char*arg,char*rp,struct stat const*sp,struct dirsav*ds,int first);
+Lstatic int recurse_donothing(UNUSED(char*arg),UNUSED(char*rp),UNUSED(struct stat const*sp),UNUSED(void*magic));
+Lstatic int rm_leaf(char*arg,char*rp,struct stat const*sp,void*magic);
+Lstatic int rm_dirpost(char*arg,char*rp,UNUSED(struct stat const*sp),void*magic);
+Lstatic int bin_rm(char*nam,char**args,Options ops,UNUSED(int func));
+Lstatic int chmod_dochmod(char*arg,char*rp,UNUSED(struct stat const*sp),void*magic);
+Lstatic int bin_chmod(char*nam,char**args,Options ops,UNUSED(int func));
+Lstatic int chown_dochown(char*arg,char*rp,UNUSED(struct stat const*sp),void*magic);
+Lstatic int chown_dolchown(char*arg,char*rp,UNUSED(struct stat const*sp),void*magic);
+Lstatic unsigned long getnumeric(char*p,int*errp);
+Lstatic int bin_chown(char*nam,char**args,Options ops,int func);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Modules_files_globals */

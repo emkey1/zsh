@@ -1,0 +1,43 @@
+E#ifndef have_Src_linklist_globals
+E#define have_Src_linklist_globals
+E
+Xnewlinklist
+Eextern mod_import_function LinkList newlinklist(void);
+Xznewlinklist
+Eextern mod_import_function LinkList znewlinklist(void);
+Xinsertlinknode
+Eextern mod_import_function LinkNode insertlinknode(LinkList list,LinkNode node,void*dat);
+Xzinsertlinknode
+Eextern mod_import_function LinkNode zinsertlinknode(LinkList list,LinkNode node,void*dat);
+Xuinsertlinknode
+Eextern mod_import_function LinkNode uinsertlinknode(LinkList list,LinkNode node,LinkNode new);
+Xinsertlinklist
+Eextern mod_import_function void insertlinklist(LinkList l,LinkNode where,LinkList x);
+Xgetlinknode
+Eextern mod_import_function void*getlinknode(LinkList list);
+Xugetnode
+Eextern mod_import_function void*ugetnode(LinkList list);
+Xremnode
+Eextern mod_import_function void*remnode(LinkList list,LinkNode nd);
+Xuremnode
+Eextern mod_import_function void*uremnode(LinkList list,LinkNode nd);
+Xfreelinklist
+Eextern mod_import_function void freelinklist(LinkList list,FreeFunc freefunc);
+Xcountlinknodes
+Eextern mod_import_function int countlinknodes(LinkList list);
+Xrolllist
+Eextern mod_import_function void rolllist(LinkList l,LinkNode nd);
+Xnewsizedlist
+Eextern mod_import_function LinkList newsizedlist(int size);
+Xjoinlists
+Eextern mod_import_function LinkList joinlists(LinkList first,LinkList second);
+Xlinknodebydatum
+Eextern mod_import_function LinkNode linknodebydatum(LinkList list,void*dat);
+Xlinknodebystring
+Eextern mod_import_function LinkNode linknodebystring(LinkList list,char*dat);
+Xhlinklist2array
+Eextern mod_import_function char**hlinklist2array(LinkList list,int copy);
+Xzlinklist2array
+Eextern mod_import_function char**zlinklist2array(LinkList list,int copy);
+E
+E#endif /* !have_Src_linklist_globals */

@@ -1,0 +1,33 @@
+E#ifndef have_Src_Modules_param_private_globals
+E#define have_Src_Modules_param_private_globals
+E
+Lstatic int is_private(Param pm);
+Lstatic int bin_private(char*nam,char**args,LinkList assigns,Options ops,int func);
+Lstatic char*pps_getfn(Param pm);
+Lstatic void pps_setfn(Param pm,char*x);
+Lstatic void pps_unsetfn(Param pm,int explicit);
+Lstatic zlong ppi_getfn(Param pm);
+Lstatic void ppi_setfn(Param pm,zlong x);
+Lstatic void ppi_unsetfn(Param pm,int explicit);
+Lstatic double ppf_getfn(Param pm);
+Lstatic void ppf_setfn(Param pm,double x);
+Lstatic void ppf_unsetfn(Param pm,int explicit);
+Lstatic char**ppa_getfn(Param pm);
+Lstatic void ppa_setfn(Param pm,char**x);
+Lstatic void ppa_unsetfn(Param pm,int explicit);
+Lstatic HashTable pph_getfn(Param pm);
+Lstatic void pph_setfn(Param pm,HashTable x);
+Lstatic void pph_unsetfn(Param pm,int explicit);
+Lstatic int private_wraplevel;
+Lstatic int wrap_private(Eprog prog,FuncWrap w,char*name);
+Lstatic HashNode getprivatenode(HashTable ht,const char*nam);
+Lstatic HashNode getprivatenode2(HashTable ht,const char*nam);
+Lstatic void printprivatenode(HashNode hn,int printflags);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(Module m);
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Modules_param_private_globals */

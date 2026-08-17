@@ -1,0 +1,102 @@
+E#ifndef have_Src_Zle_complete_globals
+E#define have_Src_Zle_complete_globals
+E
+Xcompcurrent
+Eextern mod_import_variable zlong compcurrent;
+Xcomplistmax
+Eextern mod_import_variable zlong complistmax;
+Eextern zlong complistlines;
+Eextern zlong compignored;
+Xcompwords
+Eextern mod_import_variable char**compwords;
+Xcompredirs
+Eextern mod_import_variable char**compredirs;
+Xcompprefix
+Eextern mod_import_variable char*compprefix;
+Xcompsuffix
+Eextern mod_import_variable char*compsuffix;
+Xcomplastprefix
+Eextern mod_import_variable char*complastprefix;
+Xcomplastsuffix
+Eextern mod_import_variable char*complastsuffix;
+Xcompisuffix
+Eextern mod_import_variable char*compisuffix;
+Xcompqiprefix
+Eextern mod_import_variable char*compqiprefix;
+Xcompqisuffix
+Eextern mod_import_variable char*compqisuffix;
+Xcompquote
+Eextern mod_import_variable char*compquote;
+Xcompqstack
+Eextern mod_import_variable char*compqstack;
+Xcomppatmatch
+Eextern mod_import_variable char*comppatmatch;
+Xcomplastprompt
+Eextern mod_import_variable char*complastprompt;
+Eextern char*compiprefix;
+Eextern char*compcontext;
+Eextern char*compparameter;
+Eextern char*compredirect;
+Eextern char*compquoting;
+Eextern char*comprestore;
+Eextern char*complist;
+Eextern char*compinsert;
+Eextern char*compexact;
+Eextern char*compexactstr;
+Eextern char*comppatinsert;
+Eextern char*comptoend;
+Eextern char*compoldlist;
+Eextern char*compoldins;
+Eextern char*compvared;
+Eextern Param*comprpms;
+Eextern Param*compkpms;
+Xfreecmlist
+Eextern mod_import_function void freecmlist(Cmlist l);
+Xfreecmatcher
+Eextern mod_import_function void freecmatcher(Cmatcher m);
+Eextern void freecpattern(Cpattern p);
+Xcpcmatcher
+Eextern mod_import_function Cmatcher cpcmatcher(Cmatcher m);
+Lstatic Cpattern cp_cpattern_element(Cpattern o);
+Lstatic Cpattern cpcpattern(Cpattern o);
+Xparse_cmatcher
+Eextern mod_import_function Cmatcher parse_cmatcher(char*name,char*s);
+Lstatic Cpattern parse_pattern(char*name,char**sp,int*lp,char e,int*err);
+Lstatic char*parse_class(Cpattern p,char*iptr);
+Lstatic int parse_ordering(const char*arg,int*flags);
+Lstatic int bin_compadd(char*name,char**argv,UNUSED(Options ops),UNUSED(int func));
+Xignore_prefix
+Eextern mod_import_function void ignore_prefix(int l);
+Xignore_suffix
+Eextern mod_import_function void ignore_suffix(int l);
+Xrestrict_range
+Eextern mod_import_function void restrict_range(int b,int e);
+Lstatic int do_comp_vars(int test,int na,char*sa,int nb,char*sb,int mod);
+Lstatic int bin_compset(char*name,char**argv,UNUSED(Options ops),UNUSED(int func));
+Eextern void makecompparams(void);
+Lstatic HashTable get_compstate(Param pm);
+Lstatic void set_compstate(Param pm,HashTable ht);
+Lstatic zlong get_nmatches(UNUSED(Param pm));
+Lstatic zlong get_listlines(UNUSED(Param pm));
+Lstatic void set_complist(UNUSED(Param pm),char*v);
+Lstatic char*get_complist(UNUSED(Param pm));
+Lstatic char*get_unambig(UNUSED(Param pm));
+Lstatic zlong get_unambig_curs(UNUSED(Param pm));
+Lstatic char*get_unambig_pos(UNUSED(Param pm));
+Lstatic char*get_insert_pos(UNUSED(Param pm));
+Lstatic char*get_compqstack(UNUSED(Param pm));
+Lstatic void compunsetfn(Param pm,int exp);
+Eextern void comp_setunset(int rset,int runset,int kset,int kunset);
+Lstatic int comp_wrapper(Eprog prog,FuncWrap w,char*name);
+Lstatic int comp_check(void);
+Lstatic int cond_psfix(char**a,int id);
+Lstatic int cond_range(char**a,int id);
+Eextern struct hookdef comphooks[];
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(Module m);
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Zle_complete_globals */

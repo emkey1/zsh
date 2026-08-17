@@ -1,0 +1,18 @@
+E#ifndef have_Src_text_globals
+E#define have_Src_text_globals
+E
+Eextern int text_expand_tabs;
+Eextern int is_cond_binary_op(const char*str);
+Lstatic void taddchr(int c);
+Lstatic void taddstr(const char*s);
+Lstatic void taddlist(Estate state,int num);
+Lstatic void taddassignlist(Estate state,wordcode count);
+Lstatic void taddnl(int no_semicolon);
+Eextern void zoutputtab(FILE*outf);
+Xgetpermtext
+Eextern mod_import_function char*getpermtext(Eprog prog,Wordcode c,int start_indent);
+Eextern char*getjobtext(Eprog prog,Wordcode c);
+Lstatic void gettext2(Estate state);
+Eextern void getredirs(LinkList redirs);
+E
+E#endif /* !have_Src_text_globals */

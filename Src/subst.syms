@@ -1,0 +1,29 @@
+E#ifndef have_Src_subst_globals
+E#define have_Src_subst_globals
+E
+Eextern char nulstring[];
+Lstatic LinkNode keyvalpairelement(LinkList list,LinkNode node);
+Xprefork
+Eextern mod_import_function void prefork(LinkList list,int flags,int*ret_flags);
+Lstatic char*stringsubstquote(char*strstart,char**pstrdpos);
+Lstatic LinkNode stringsubst(LinkList list,LinkNode node,int pf_flags,int*ret_flags,int asssub);
+Eextern char*quotesubst(char*str);
+Xgloblist
+Eextern mod_import_function void globlist(LinkList list,int flags);
+Xsingsub
+Eextern mod_import_function void singsub(char**s);
+Lstatic int multsub(char**s,int pf_flags,char***a,int*isarr,char*sep,int*ms_flags);
+Xfilesub
+Eextern mod_import_function void filesub(char**namptr,int assign);
+Eextern char*equalsubstr(char*str,int assign,int nomatch);
+Xfilesubstr
+Eextern mod_import_function int filesubstr(char**namptr,int assign);
+Lstatic char*strcatsub(char**d,char*pb,char*pe,char*src,int l,char*s,int glbsub,int copied);
+Eextern char*get_strarg(char*s,int*lenp);
+Lstatic int get_intarg(char**s,int*delmatchp);
+Lstatic LinkNode paramsubst(LinkList l,LinkNode n,char**str,int qt,int pf_flags,int*ret_flags);
+Lstatic char*arithsubst(char*a,char**bptr,char*rest);
+Eextern void modify(char**str,char**ptr,int inbrace);
+Lstatic char*dstackent(char ch,int val);
+E
+E#endif /* !have_Src_subst_globals */

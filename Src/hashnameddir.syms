@@ -1,0 +1,14 @@
+E#ifndef have_Src_hashnameddir_globals
+E#define have_Src_hashnameddir_globals
+E
+Xnameddirtab
+Eextern mod_import_variable HashTable nameddirtab;
+Eextern void createnameddirtable(void);
+Lstatic void emptynameddirtable(HashTable ht);
+Lstatic void fillnameddirtable(UNUSED(HashTable ht));
+Lstatic void addnameddirnode(HashTable ht,char*nam,void*nodeptr);
+Lstatic HashNode removenameddirnode(HashTable ht,const char*nam);
+Lstatic void freenameddirnode(HashNode hn);
+Lstatic void printnameddirnode(HashNode hn,int printflags);
+E
+E#endif /* !have_Src_hashnameddir_globals */

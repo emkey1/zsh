@@ -1,0 +1,17 @@
+E#ifndef have_Src_Modules_mapfile_globals
+E#define have_Src_Modules_mapfile_globals
+E
+Lstatic void setpmmapfile(Param pm,char*value);
+Lstatic void unsetpmmapfile(Param pm,UNUSED(int exp));
+Lstatic void setpmmapfiles(Param pm,HashTable ht);
+Lstatic char*get_contents(char*fname);
+Lstatic HashNode getpmmapfile(UNUSED(HashTable ht),const char*name);
+Lstatic void scanpmmapfile(UNUSED(HashTable ht),ScanFunc func,int flags);
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Modules_mapfile_globals */

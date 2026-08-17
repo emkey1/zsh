@@ -1,0 +1,24 @@
+E#ifndef have_Src_Builtins_rlimits_globals
+E#define have_Src_Builtins_rlimits_globals
+E
+Lstatic void set_resinfo(void);
+Lstatic void free_resinfo(void);
+Lstatic int find_resource(convchar_t c);
+Lstatic void printrlim(rlim_t val,const char*unit);
+Lstatic rlim_t zstrtorlimt(const char*s,char**t,int base);
+Lstatic void showlimitvalue(int lim,rlim_t val);
+Lstatic int showlimits(char*nam,int hard,int lim);
+Lstatic int printulimit(char*nam,int lim,int hard,int head);
+Lstatic int do_limit(char*nam,int lim,rlim_t val,int hard,int soft,int set);
+Lstatic int bin_limit(char*nam,char**argv,Options ops,UNUSED(int func));
+Lstatic int do_unlimit(char*nam,int lim,int hard,int soft,int set,int euid);
+Lstatic int bin_unlimit(char*nam,char**argv,Options ops,UNUSED(int func));
+Lstatic int bin_ulimit(char*name,char**argv,UNUSED(Options ops),UNUSED(int func));
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Builtins_rlimits_globals */

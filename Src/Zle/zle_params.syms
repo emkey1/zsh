@@ -1,0 +1,69 @@
+E#ifndef have_Src_Zle_zle_params_globals
+E#define have_Src_Zle_zle_params_globals
+E
+Xmakezleparams
+Eextern mod_import_function void makezleparams(int ro);
+Lstatic void zleunsetfn(Param pm,int exp);
+Lstatic void set_buffer(UNUSED(Param pm),char*x);
+Lstatic char*get_buffer(UNUSED(Param pm));
+Lstatic void set_cursor(UNUSED(Param pm),zlong x);
+Lstatic zlong get_cursor(UNUSED(Param pm));
+Lstatic void set_mark(UNUSED(Param pm),zlong x);
+Lstatic zlong get_mark(UNUSED(Param pm));
+Lstatic void set_region_active(UNUSED(Param pm),zlong x);
+Lstatic zlong get_region_active(UNUSED(Param pm));
+Lstatic void set_lbuffer(UNUSED(Param pm),char*x);
+Lstatic char*get_lbuffer(UNUSED(Param pm));
+Lstatic void set_rbuffer(UNUSED(Param pm),char*x);
+Lstatic char*get_rbuffer(UNUSED(Param pm));
+Lstatic char*get_prebuffer(UNUSED(Param pm));
+Lstatic char*get_widget(UNUSED(Param pm));
+Lstatic char*get_widgetfunc(UNUSED(Param pm));
+Lstatic char*get_widgetstyle(UNUSED(Param pm));
+Lstatic char*get_lwidget(UNUSED(Param pm));
+Lstatic char*get_keymap(UNUSED(Param pm));
+Lstatic char*get_keys(UNUSED(Param pm));
+Lstatic zlong get_keys_queued_count(UNUSED(Param pm));
+Lstatic void set_numeric(UNUSED(Param pm),zlong x);
+Lstatic zlong get_numeric(UNUSED(Param pm));
+Lstatic void unset_numeric(Param pm,int exp);
+Lstatic void set_histno(UNUSED(Param pm),zlong x);
+Lstatic zlong get_histno(UNUSED(Param pm));
+Lstatic zlong get_bufferlines(UNUSED(Param pm));
+Lstatic zlong get_pending(UNUSED(Param pm));
+Lstatic zlong get_recursive(UNUSED(Param pm));
+Lstatic zlong get_yankstart(UNUSED(Param pm));
+Lstatic zlong get_yankend(UNUSED(Param pm));
+Lstatic zlong get_yankactive(UNUSED(Param pm));
+Lstatic void set_yankstart(UNUSED(Param pm),zlong i);
+Lstatic void set_yankend(UNUSED(Param pm),zlong i);
+Lstatic zlong get_isearchmatchstart(UNUSED(Param pm));
+Lstatic zlong get_isearchmatchend(UNUSED(Param pm));
+Lstatic zlong get_isearchmatchactive(UNUSED(Param pm));
+Lstatic zlong get_suffixstart(UNUSED(Param pm));
+Lstatic zlong get_suffixend(UNUSED(Param pm));
+Lstatic zlong get_suffixactive(UNUSED(Param pm));
+Lstatic char*get_cutbuffer(UNUSED(Param pm));
+Lstatic void set_cutbuffer(UNUSED(Param pm),char*x);
+Lstatic void unset_cutbuffer(Param pm,int exp);
+Lstatic void set_killring(UNUSED(Param pm),char**x);
+Lstatic char**get_killring(UNUSED(Param pm));
+Lstatic void unset_killring(Param pm,int exp);
+Lstatic void set_register(Param pm,char*value);
+Lstatic void set_register_buf(Param pm,char*value);
+Lstatic void unset_register(Param pm,UNUSED(int exp));
+Lstatic void scan_registers(UNUSED(HashTable ht),ScanFunc func,int flags);
+Lstatic HashNode get_registers(UNUSED(HashTable ht),const char*name);
+Lstatic void set_registers(Param pm,HashTable ht);
+Lstatic void unset_registers(Param pm,int exp);
+Lstatic void set_predisplay(UNUSED(Param pm),char*x);
+Lstatic char*get_predisplay(UNUSED(Param pm));
+Lstatic void set_postdisplay(UNUSED(Param pm),char*x);
+Lstatic char*get_postdisplay(UNUSED(Param pm));
+Eextern void free_prepostdisplay(void);
+Lstatic char*get_lasearch(UNUSED(Param pm));
+Lstatic char*get_lsearch(UNUSED(Param pm));
+Lstatic char*get_context(UNUSED(Param pm));
+Lstatic char*get_zle_state(UNUSED(Param pm));
+E
+E#endif /* !have_Src_Zle_zle_params_globals */

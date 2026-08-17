@@ -1,0 +1,9 @@
+/* Generated automatically */
+#ifndef have_Src_Modules_random_real_globals
+#define have_Src_Modules_random_real_globals
+
+extern int _zclz64(uint64_t x);
+extern uint64_t random_64bit(void);
+extern double random_real(void);
+
+#endif /* !have_Src_Modules_random_real_globals */

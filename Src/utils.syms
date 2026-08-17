@@ -1,0 +1,335 @@
+E#ifndef have_Src_utils_globals
+E#define have_Src_utils_globals
+E
+Xscriptname
+Eextern mod_import_variable char*scriptname;
+Xscriptfilename
+Eextern mod_import_variable char*scriptfilename;
+Xincompfunc
+Eextern mod_import_variable int incompfunc;
+Xzerr
+Eextern mod_import_function void zerr(VA_ALIST_PROTO1(const char *fmt));
+Xzerrnam
+Eextern mod_import_function void zerrnam(VA_ALIST_PROTO2(const char *cmd, const char *fmt));
+Xzwarn
+Eextern mod_import_function void zwarn(VA_ALIST_PROTO1(const char *fmt));
+Xzwarnnam
+Eextern mod_import_function void zwarnnam(VA_ALIST_PROTO2(const char *cmd, const char *fmt));
+Xdputs
+Eextern mod_import_function void dputs(VA_ALIST_PROTO1(const char *message));
+Eextern void zerrmsg(FILE*file,const char*fmt,va_list ap);
+Xzsetupterm
+Eextern mod_import_function void zsetupterm(void);
+Xzdeleteterm
+Eextern mod_import_function void zdeleteterm(void);
+Xputraw
+Eextern mod_import_function int putraw(int c);
+Xputshout
+Eextern mod_import_function int putshout(int c);
+Xnicechar_sel
+Eextern mod_import_function char*nicechar_sel(int c,int quotable);
+Xnicechar
+Eextern mod_import_function char*nicechar(int c);
+Xis_nicechar
+Eextern mod_import_function int is_nicechar(int c);
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Xmb_charinit
+Eextern mod_import_function void mb_charinit(void);
+Xwcs_nicechar_sel
+Eextern mod_import_function char*wcs_nicechar_sel(wchar_t c,size_t*widthp,char**swidep,int quotable);
+Xwcs_nicechar
+Eextern mod_import_function char*wcs_nicechar(wchar_t c,size_t*widthp,char**swidep);
+Xis_wcs_nicechar
+Eextern mod_import_function int is_wcs_nicechar(wchar_t c);
+Xzwcwidth
+Eextern mod_import_function int zwcwidth(wint_t wc);
+E#endif /* MULTIBYTE_SUPPORT */
+L#endif /* MULTIBYTE_SUPPORT */
+Eextern char*pathprog(char*prog,char**namep);
+Eextern char*findpwd(char*s);
+Eextern int ispwd(char*s);
+Lstatic char**slashsplit(char*s);
+Lstatic int xsymlinks(char*s);
+Xxsymlink
+Eextern mod_import_function char*xsymlink(char*s,int heap);
+Eextern void print_if_link(char*s,int all);
+Eextern void fprintdir(char*s,FILE*f);
+Eextern char*substnamedir(char*s);
+Eextern uid_t cached_uid;
+Eextern char*cached_username;
+Xget_username
+Eextern mod_import_function char*get_username(void);
+Lstatic void finddir_scan(HashNode hn,UNUSED(int flags));
+Eextern Nameddir finddir(char*s);
+Xadduserdir
+Eextern mod_import_function void adduserdir(char*s,char*t,int flags,int always);
+Eextern char*getnameddir(char*name);
+Lstatic int dircmp(char*s,char*t);
+Xaddprepromptfn
+Eextern mod_import_function void addprepromptfn(voidvoidfnptr_t func);
+Xdelprepromptfn
+Eextern mod_import_function void delprepromptfn(voidvoidfnptr_t func);
+Xtimedfns
+Eextern mod_import_variable LinkList timedfns;
+Xaddtimedfn
+Eextern mod_import_function void addtimedfn(voidvoidfnptr_t func,time_t when);
+Xdeltimedfn
+Eextern mod_import_function void deltimedfn(voidvoidfnptr_t func);
+Eextern time_t lastmailcheck;
+Xcallhookfunc
+Eextern mod_import_function int callhookfunc(char*name,LinkList lnklst,int arrayp,int*retval);
+Eextern void preprompt(void);
+Lstatic void checkmailpath(char**s);
+Eextern FILE*xtrerr;
+Eextern void printprompt4(void);
+Xfreestr
+Eextern mod_import_function void freestr(void*a);
+Xgettyinfo
+Eextern mod_import_function void gettyinfo(struct ttyinfo*ti);
+Xfdgettyinfo
+Eextern mod_import_function void fdgettyinfo(int SHTTY,struct ttyinfo*ti);
+Xsettyinfo
+Eextern mod_import_function void settyinfo(struct ttyinfo*ti);
+Xfdsettyinfo
+Eextern mod_import_function void fdsettyinfo(int SHTTY,struct ttyinfo*ti);
+Xshttyinfo
+Eextern mod_import_variable struct ttyinfo shttyinfo;
+Xresetneeded
+Eextern mod_import_variable int resetneeded;
+Xwinchanged
+Eextern mod_import_variable int winchanged;
+Eextern void adjustwinsize(int from);
+Xmovefd
+Eextern mod_import_function int movefd(int fd);
+Xredup
+Eextern mod_import_function int redup(int x,int y);
+Xaddmodulefd
+Eextern mod_import_function void addmodulefd(int fd,int fdt);
+Xaddlockfd
+Eextern mod_import_function void addlockfd(int fd,int cloexec);
+Xzclose
+Eextern mod_import_function int zclose(int fd);
+Xzcloselockfd
+Eextern mod_import_function int zcloselockfd(int fd);
+Xgettempname
+Eextern mod_import_function char*gettempname(const char*prefix,int use_heap);
+Xgettempfile
+Eextern mod_import_function int gettempfile(const char*prefix,int use_heap,char**tempname);
+Xhas_token
+Eextern mod_import_function int has_token(const char*s);
+Xchuck
+Eextern mod_import_function void chuck(char*str);
+Xtulower
+Eextern mod_import_function int tulower(int c);
+Xtuupper
+Eextern mod_import_function int tuupper(int c);
+Eextern void ztrncpy(char*s,char*t,int len);
+Xstrucpy
+Eextern mod_import_function void strucpy(char**s,char*t);
+Xstruncpy
+Eextern mod_import_function void struncpy(char**s,char*t,int n);
+Xarrlen
+Eextern mod_import_function int arrlen(char**s);
+Xarrlen_ge
+Eextern mod_import_function char arrlen_ge(char**s,unsigned lower_bound);
+Xarrlen_gt
+Eextern mod_import_function char arrlen_gt(char**s,unsigned lower_bound);
+Xarrlen_le
+Eextern mod_import_function char arrlen_le(char**s,unsigned upper_bound);
+Xarrlen_lt
+Eextern mod_import_function char arrlen_lt(char**s,unsigned upper_bound);
+Xskipparens
+Eextern mod_import_function int skipparens(char inpar,char outpar,char**s);
+Xzstrtol
+Eextern mod_import_function zlong zstrtol(const char*s,char**t,int base);
+Xzstrtol_underscore
+Eextern mod_import_function zlong zstrtol_underscore(const char*s,char**t,int base,int underscore);
+Xzstrtoul_underscore
+Eextern mod_import_function int zstrtoul_underscore(const char*s,zulong*retval);
+Xsetblock_fd
+Eextern mod_import_function int setblock_fd(int turnonblocking,int fd,long*modep);
+Eextern int setblock_stdin(void);
+Xread_poll
+Eextern mod_import_function int read_poll(int fd,int*readchar,int polltty,zlong microseconds);
+Xtimespec_diff_us
+Eextern mod_import_function long timespec_diff_us(const struct timespec*t1,const struct timespec*t2);
+Xzmonotime
+Eextern mod_import_function int zmonotime(time_t*tloc);
+Xzsleep
+Eextern mod_import_function int zsleep(long us);
+Eextern int zsleep_random(long max_us,time_t end_time);
+Eextern int checkrmall(char*s);
+Xread_loop
+Eextern mod_import_function ssize_t read_loop(int fd,char*buf,size_t len);
+Xwrite_loop
+Eextern mod_import_function ssize_t write_loop(int fd,const char*buf,size_t len);
+Xnoquery
+Eextern mod_import_function int noquery(int purge);
+Eextern int getquery(char*valid_chars,int purge);
+Lstatic void spscan(HashNode hn,UNUSED(int scanflags));
+Xspckword
+Eextern mod_import_function void spckword(char**s,int hist,int cmd,int ask);
+Xztrftime
+Eextern mod_import_function int ztrftime(char*buf,int bufsize,char*fmt,struct tm*tm,long nsec);
+Xzjoin
+Eextern mod_import_function char*zjoin(char**arr,int delim,int heap);
+Xcolonsplit
+Eextern mod_import_function char**colonsplit(char*s,int uniq);
+Lstatic int skipwsep(char**s);
+Xspacesplit
+Eextern mod_import_function char**spacesplit(char*s,int allownull,int heap,int quote);
+Lstatic int findsep(char**s,char*sep,int quote);
+Eextern char*findword(char**s,char*sep);
+Eextern int wordcount(char*s,char*sep,int mul);
+Xsepjoin
+Eextern mod_import_function char*sepjoin(char**s,char*sep,int heap);
+Eextern char**sepsplit(char*s,char*sep,int allownull,int heap);
+Xgetshfunc
+Eextern mod_import_function Shfunc getshfunc(char*nam);
+Eextern char**subst_string_by_func(Shfunc func,char*arg1,char*orig);
+Eextern char**subst_string_by_hook(char*name,char*arg1,char*orig);
+Xmkarray
+Eextern mod_import_function char**mkarray(char*s);
+Xhmkarray
+Eextern mod_import_function char**hmkarray(char*s);
+Xzbeep
+Eextern mod_import_function void zbeep(void);
+Xfreearray
+Eextern mod_import_function void freearray(char**s);
+Eextern int equalsplit(char*s,char**t);
+Xtyptab
+Eextern mod_import_variable short int typtab[256];
+Eextern void inittyptab(void);
+Xmakecommaspecial
+Eextern mod_import_function void makecommaspecial(int yesno);
+Xmakebangspecial
+Eextern mod_import_function void makebangspecial(int yesno);
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Xwcsiblank
+Eextern mod_import_function int wcsiblank(wint_t wc);
+Xwcsitype
+Eextern mod_import_function int wcsitype(wchar_t c,int itype);
+E#endif
+L#endif
+Xitype_end
+Eextern mod_import_function char*itype_end(const char*ptr,int itype,int once);
+Xarrdup
+Eextern mod_import_function char**arrdup(char**s);
+Xarrdup_max
+Eextern mod_import_function char**arrdup_max(char**s,unsigned max);
+Xzarrdup
+Eextern mod_import_function char**zarrdup(char**s);
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Xwcs_zarrdup
+Eextern mod_import_function wchar_t**wcs_zarrdup(wchar_t**s);
+E#endif /* MULTIBYTE_SUPPORT */
+L#endif /* MULTIBYTE_SUPPORT */
+Lstatic char*spname(char*oldname);
+Lstatic int mindist(char*dir,char*mindistguess,char*mindistbest,int wantdir);
+Lstatic int spdist(char*s,char*t,int thresh);
+Eextern void setcbreak(void);
+Xattachtty
+Eextern mod_import_function void attachtty(pid_t pgrp);
+Eextern pid_t gettygrp(void);
+Xmetafy
+Eextern mod_import_function char*metafy(char*buf,int len,int heap);
+Xztrdup_metafy
+Eextern mod_import_function char*ztrdup_metafy(const char*s);
+Xunmetafy
+Eextern mod_import_function char*unmetafy(char*s,int*len);
+Xmetalen
+Eextern mod_import_function int metalen(const char*s,int len);
+Xunmeta
+Eextern mod_import_function char*unmeta(const char*file_name);
+Xunmeta_one
+Eextern mod_import_function convchar_t unmeta_one(const char*in,int*sz);
+Eextern int ztrcmp(char const*s1,char const*s2);
+Xztrlen
+Eextern mod_import_function int ztrlen(char const*s);
+Xztrlenend
+Eextern mod_import_function int ztrlenend(char const*s,char const*eptr);
+Xztrsub
+Eextern mod_import_function int ztrsub(char const*t,char const*s);
+Xzreaddir
+Eextern mod_import_function char*zreaddir(DIR*dir,int ignoredots);
+Xzputs
+Eextern mod_import_function int zputs(char const*s,FILE*stream);
+Xnicedup
+Eextern mod_import_function char*nicedup(char const*s,int heap);
+Xnicedupstring
+Eextern mod_import_function char*nicedupstring(char const*s);
+E#ifndef MULTIBYTE_SUPPORT
+L#ifndef MULTIBYTE_SUPPORT
+Xnicezputs
+Eextern mod_import_function int nicezputs(char const*s,FILE*stream);
+Xniceztrlen
+Eextern mod_import_function size_t niceztrlen(char const*s);
+E#endif
+L#endif
+E#ifdef MULTIBYTE_SUPPORT
+L#ifdef MULTIBYTE_SUPPORT
+Xmb_niceformat
+Eextern mod_import_function size_t mb_niceformat(const char*s,FILE*stream,char**outstrp,int flags);
+Xis_mb_niceformat
+Eextern mod_import_function int is_mb_niceformat(const char*s);
+Xnicedup
+Eextern mod_import_function char*nicedup(const char*s,int heap);
+Xmb_metacharlenconv_r
+Eextern mod_import_function int mb_metacharlenconv_r(const char*s,wint_t*wcp,mbstate_t*mbsp);
+Xmb_metacharlenconv
+Eextern mod_import_function int mb_metacharlenconv(const char*s,wint_t*wcp);
+Xmb_metastrlenend
+Eextern mod_import_function int mb_metastrlenend(char*ptr,int width,char*eptr);
+Xmb_charlenconv_r
+Eextern mod_import_function int mb_charlenconv_r(const char*s,int slen,wint_t*wcp,mbstate_t*mbsp);
+Xmb_charlenconv
+Eextern mod_import_function int mb_charlenconv(const char*s,int slen,wint_t*wcp);
+E#else /* MULTIBYTE_SUPPORT */
+L#else /* MULTIBYTE_SUPPORT */
+Xmetacharlenconv
+Eextern mod_import_function int metacharlenconv(const char*x,int*c);
+Xcharlenconv
+Eextern mod_import_function int charlenconv(const char*x,int len,int*c);
+Xsb_niceformat
+Eextern mod_import_function size_t sb_niceformat(const char*s,FILE*stream,char**outstrp,int flags);
+Xis_sb_niceformat
+Eextern mod_import_function int is_sb_niceformat(const char*s);
+E#endif /* MULTIBYTE_SUPPORT */
+L#endif /* MULTIBYTE_SUPPORT */
+Xzexpandtabs
+Eextern mod_import_function int zexpandtabs(const char*s,int len,int width,int startpos,FILE*fout,int all);
+Xhasspecial
+Eextern mod_import_function int hasspecial(char const*s);
+Xquotestring
+Eextern mod_import_function char*quotestring(const char*s,int instring);
+Xquotedzputs
+Eextern mod_import_function char*quotedzputs(char const*s,FILE*stream);
+Xdquotedztrdup
+Eextern mod_import_function char*dquotedztrdup(char const*s);
+Eextern int ucs4tomb(unsigned int wval,char*buf);
+Xgetkeystring
+Eextern mod_import_function char*getkeystring(char*s,int*len,int how,int*misc);
+Xstrpfx
+Eextern mod_import_function int strpfx(const char*s,const char*t);
+Xstrsfx
+Eextern mod_import_function int strsfx(char*s,char*t);
+Lstatic int upchdir(int n);
+Xinit_dirsav
+Eextern mod_import_function void init_dirsav(Dirsav d);
+Xlchdir
+Eextern mod_import_function int lchdir(char const*path,struct dirsav*d,int hard);
+Xrestoredir
+Eextern mod_import_function int restoredir(struct dirsav*d);
+Eextern int privasserted(void);
+Xmode_to_octal
+Eextern mod_import_function int mode_to_octal(mode_t mode);
+E#ifdef MAILDIR_SUPPORT
+L#ifdef MAILDIR_SUPPORT
+Eextern int mailstat(char*path,struct stat*st);
+E#endif
+L#endif
+E
+E#endif /* !have_Src_utils_globals */

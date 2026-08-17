@@ -1,0 +1,98 @@
+E#ifndef have_Src_jobs_globals
+E#define have_Src_jobs_globals
+E
+Eextern pid_t origpgrp;
+Xmypgrp
+Eextern mod_import_variable pid_t mypgrp;
+Eextern pid_t last_attached_pgrp;
+Xthisjob
+Eextern mod_import_variable int thisjob;
+Xcurjob
+Eextern mod_import_variable int curjob;
+Xprevjob
+Eextern mod_import_variable int prevjob;
+Xjobtab
+Eextern mod_import_variable struct job*jobtab;
+Xjobtabsize
+Eextern mod_import_variable int jobtabsize;
+Xmaxjob
+Eextern mod_import_variable int maxjob;
+E#ifdef HAVE_GETRUSAGE
+L#ifdef HAVE_GETRUSAGE
+Lstatic struct rusage child_usage;
+E#else
+L#else
+Lstatic struct tms shtms;
+E#endif
+L#endif
+Xttyfrozen
+Eextern mod_import_variable int ttyfrozen;
+Eextern int prev_errflag;
+Eextern int prev_breaks;
+Eextern int errbrk_saved;
+Eextern int numpipestats;
+Eextern int pipestats[MAX_PIPESTATS];
+Lstatic struct timeval*dtime_tv(struct timeval*dt,struct timeval*t1,struct timeval*t2);
+Lstatic struct timespec*dtime_ts(struct timespec*dt,struct timespec*t1,struct timespec*t2);
+Eextern void makerunning(Job jn);
+Eextern int findproc(pid_t pid,Job*jptr,Process*pptr,int aux);
+Eextern int hasprocs(int job);
+Lstatic int super_job(int sub);
+Lstatic int handle_sub(int job,int fg);
+Eextern void get_usage(void);
+Eextern void update_process(Process pn,int status);
+Eextern void check_cursh_sig(int sig);
+Eextern void storepipestats(Job jn,int inforeground,int fixlastval);
+Eextern void update_job(Job jn);
+Eextern void update_bg_job(Job jn,pid_t pid,int status);
+Lstatic void setprevjob(void);
+Eextern long get_clktck(void);
+Lstatic void printhhmmss(double secs);
+Lstatic void dumptime(Job jn);
+Lstatic int should_report_time(Job j);
+Xsigmsg
+Eextern mod_import_function char*sigmsg(int sig);
+Eextern int printjob(Job jn,int lng,int synch);
+Eextern void addfilelist(const char*name,int fd);
+Eextern void pipecleanfilelist(LinkList filelist,int proc_subst_only);
+Eextern void deletefilelist(LinkList file_list,int disowning);
+Eextern void cleanfilelists(void);
+Eextern void freejob(Job jn,int deleting);
+Eextern void deletejob(Job jn,int disowning);
+Eextern void addproc(pid_t pid,char*text,int aux,struct timespec*bgtime,int gleader,int list_pipe_job_used);
+Eextern int havefiles(void);
+Eextern int waitforpid(pid_t pid,int wait_cmd);
+Lstatic int zwaitjob(int job,int wait_cmd);
+Eextern void waitjobs(void);
+Xclearjobtab
+Eextern mod_import_function void clearjobtab(int monitor);
+Eextern void clearoldjobtab(void);
+Eextern int initjob(void);
+Eextern void setjobpwd(void);
+Eextern void spawnjob(void);
+Eextern void shelltime(child_times_t*shell,child_times_t*kids,struct timespec*then,int delta);
+Eextern void scanjobs(void);
+Lstatic int isanum(char*s);
+Lstatic void setcurjob(void);
+Xselectjobtab
+Eextern mod_import_function void selectjobtab(Job*jtabp,int*jmaxp);
+Xgetjob
+Eextern mod_import_function int getjob(const char*s,const char*prog);
+Eextern void init_jobs(char**argv,char**envp);
+Eextern int expandjobtab(void);
+Eextern void maybeshrinkjobtab(void);
+Eextern void addbgstatus(pid_t pid,int status);
+Eextern int bin_fg(char*name,char**argv,Options ops,int func);
+Eextern int bin_kill(char*nam,char**argv,UNUSED(Options ops),UNUSED(int func));
+Xgetsigidx
+Eextern mod_import_function int getsigidx(const char*s);
+Xgetsigname
+Eextern mod_import_function const char*getsigname(int sig);
+Eextern HashNode gettrapnode(int sig,int ignoredisable);
+Eextern void removetrapnode(int sig);
+Eextern int bin_suspend(char*name,UNUSED(char**argv),Options ops,UNUSED(int func));
+Eextern int findjobnam(const char*s);
+Eextern void acquire_pgrp(void);
+Eextern void release_pgrp(void);
+E
+E#endif /* !have_Src_jobs_globals */

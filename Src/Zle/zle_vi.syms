@@ -1,0 +1,53 @@
+E#ifndef have_Src_Zle_zle_vi_globals
+E#define have_Src_Zle_zle_vi_globals
+E
+Eextern int virangeflag;
+Eextern int wordflag;
+Eextern int vilinerange;
+Eextern struct vichange lastvichg;
+Eextern struct vichange curvichg;
+Eextern int vichgflag;
+Eextern int viinrepeat;
+Eextern int viinsbegin;
+Eextern void startvichange(int im);
+Lstatic void startvitext(int im);
+Eextern ZLE_INT_T vigetkey(void);
+Lstatic int getvirange(int wf);
+Lstatic int dovilinerange(void);
+Eextern int viaddnext(UNUSED(char**args));
+Eextern int viaddeol(UNUSED(char**args));
+Eextern int viinsert(UNUSED(char**args));
+Eextern void viinsert_init(void);
+Eextern int viinsertbol(UNUSED(char**args));
+Eextern int videlete(UNUSED(char**args));
+Eextern int videletechar(char**args);
+Eextern int vichange(UNUSED(char**args));
+Eextern int visubstitute(UNUSED(char**args));
+Eextern int vichangeeol(UNUSED(char**args));
+Eextern int vichangewholeline(char**args);
+Eextern int viyank(UNUSED(char**args));
+Eextern int viyankeol(UNUSED(char**args));
+Eextern int viyankwholeline(UNUSED(char**args));
+Eextern int vireplace(UNUSED(char**args));
+Eextern int vireplacechars(UNUSED(char**args));
+Eextern int vicmdmode(UNUSED(char**args));
+Eextern int viopenlinebelow(UNUSED(char**args));
+Eextern int viopenlineabove(UNUSED(char**args));
+Eextern int vioperswapcase(UNUSED(char**args));
+Eextern int viupcase(UNUSED(char**args));
+Eextern int vidowncase(UNUSED(char**args));
+Eextern int virepeatchange(UNUSED(char**args));
+Eextern int viindent(UNUSED(char**args));
+Eextern int viunindent(UNUSED(char**args));
+Eextern int vibackwarddeletechar(char**args);
+Eextern int vikillline(UNUSED(char**args));
+Eextern int vijoin(UNUSED(char**args));
+Eextern int viswapcase(UNUSED(char**args));
+Eextern int vicapslockpanic(UNUSED(char**args));
+Eextern int visetbuffer(char**args);
+Eextern int vikilleol(UNUSED(char**args));
+Eextern int vipoundinsert(UNUSED(char**args));
+Eextern int viquotedinsert(char**args);
+Eextern int vidigitorbeginningofline(char**args);
+E
+E#endif /* !have_Src_Zle_zle_vi_globals */

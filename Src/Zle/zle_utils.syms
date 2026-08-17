@@ -1,0 +1,77 @@
+E#ifndef have_Src_Zle_zle_utils_globals
+E#define have_Src_Zle_zle_utils_globals
+E
+Eextern struct cutbuffer cutbuf;
+Eextern struct cutbuffer*kring;
+Eextern int kringsize;
+Eextern int kringnum;
+Eextern struct cutbuffer vibuf[36];
+Eextern ZLE_STRING_T lastline;
+Eextern int lastlinesz;
+Eextern int lastll;
+Eextern int lastcs;
+Eextern int linesz;
+Eextern void sizeline(int sz);
+Xzleaddtoline
+Eextern mod_import_function void zleaddtoline(int chr);
+Eextern int zlecharasstring(ZLE_CHAR_T inchar,char*buf);
+Xzlelineasstring
+Eextern mod_import_function char*zlelineasstring(ZLE_STRING_T instr,int inll,int incs,int*outllp,int*outcsp,int useheap);
+Xstringaszleline
+Eextern mod_import_function ZLE_STRING_T stringaszleline(char*instr,int incs,int*outll,int*outsz,int*outcs);
+Xzlegetline
+Eextern mod_import_function char*zlegetline(int*ll,int*cs);
+Eextern void free_region_highlights_memos(void);
+Xzle_save_positions
+Eextern mod_import_function void zle_save_positions(void);
+Xzle_restore_positions
+Eextern mod_import_function void zle_restore_positions(void);
+Xzle_free_positions
+Eextern mod_import_function void zle_free_positions(void);
+Xspaceinline
+Eextern mod_import_function void spaceinline(int ct);
+Eextern void shiftchars(int to,int cnt);
+Eextern void cut(int i,int ct,int flags);
+Eextern void cuttext(ZLE_STRING_T line,int ct,int flags);
+Xbackkill
+Eextern mod_import_function void backkill(int ct,int flags);
+Xforekill
+Eextern mod_import_function void forekill(int ct,int flags);
+Xbackdel
+Eextern mod_import_function void backdel(int ct,int flags);
+Xforedel
+Eextern mod_import_function void foredel(int ct,int flags);
+Eextern void setline(char*s,int flags);
+Eextern int findbol(void);
+Eextern int findeol(void);
+Eextern void findline(int*a,int*b);
+Xgetzlequery
+Eextern mod_import_function int getzlequery(void);
+Eextern char*bindztrdup(char*str);
+Eextern int printbind(char*str,FILE*stream);
+Xshowmsg
+Eextern mod_import_function void showmsg(char const*msg);
+Eextern int handlefeep(UNUSED(char**args));
+Eextern int handlesuffix(UNUSED(char**args));
+Eextern struct change*curchange;
+Eextern zlong undo_changeno;
+Eextern void initundo(void);
+Eextern void freeundo(void);
+Lstatic void freechanges(struct change*p);
+Xhandleundo
+Eextern mod_import_function void handleundo(void);
+Eextern void mkundoent(void);
+Eextern void setlastline(void);
+Eextern int undo(char**args);
+Lstatic int unapplychange(struct change*ch);
+Eextern int redo(UNUSED(char**args));
+Lstatic int applychange(struct change*ch);
+Eextern int viundochange(char**args);
+Eextern int splitundo(UNUSED(char**args));
+Eextern void mergeundo(void);
+Eextern void zlecallhook(char*name,char*arg);
+Eextern zlong get_undo_current_change(UNUSED(Param pm));
+Eextern zlong get_undo_limit_change(UNUSED(Param pm));
+Eextern void set_undo_limit_change(UNUSED(Param pm),zlong value);
+E
+E#endif /* !have_Src_Zle_zle_utils_globals */

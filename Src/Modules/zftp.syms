@@ -1,0 +1,59 @@
+E#ifndef have_Src_Modules_zftp_globals
+E#define have_Src_Modules_zftp_globals
+E
+Lstatic void zfhandler(int sig);
+Lstatic void zfalarm(int tmout);
+Lstatic void zfpipe(void);
+Lstatic void zfunalarm(void);
+Lstatic void zfunpipe(void);
+Lstatic int zfmovefd(int fd);
+Lstatic void zfsetparam(char*name,void*val,int flags);
+Lstatic void zfunsetparam(char*name);
+Lstatic char*zfargstring(char*cmd,char**args);
+Lstatic int zfgetline(char*ln,int lnsize,int tmout);
+Lstatic int zfgetmsg(void);
+Lstatic int zfsendcmd(char*cmd);
+Lstatic int zfopendata(char*name,union tcp_sockaddr*zdsockp,int*is_passivep);
+Lstatic void zfclosedata(void);
+Lstatic int zfgetdata(char*name,char*rest,char*cmd,int getsize);
+Lstatic int zfstats(char*fnam,int remote,off_t*retsize,char**retmdtm,int fd);
+Lstatic void zfstarttrans(char*nam,int recv,off_t sz);
+Lstatic void zfendtrans(void);
+Lstatic int zfread(int fd,char*bf,off_t sz,int tmout);
+Lstatic int zfwrite(int fd,char*bf,off_t sz,int tmout);
+Lstatic int zfread_block(int fd,char*bf,off_t sz,int tmout);
+Lstatic int zfwrite_block(int fd,char*bf,off_t sz,int tmout);
+Lstatic int zfsenddata(char*name,int recv,int progress,off_t startat);
+Lstatic int zftp_open(char*name,char**args,int flags);
+Lstatic char*zfgetinfo(char*prompt,int noecho);
+Lstatic int zftp_params(UNUSED(char*name),char**args,UNUSED(int flags));
+Lstatic int zftp_login(char*name,char**args,UNUSED(int flags));
+Lstatic int zftp_test(UNUSED(char*name),UNUSED(char**args),UNUSED(int flags));
+Lstatic int zftp_dir(char*name,char**args,int flags);
+Lstatic int zftp_cd(UNUSED(char*name),char**args,int flags);
+Lstatic int zfgetcwd(void);
+Lstatic int zfsettype(int type);
+Lstatic int zftp_type(char*name,char**args,int flags);
+Lstatic int zftp_mode(char*name,char**args,UNUSED(int flags));
+Lstatic int zftp_local(UNUSED(char*name),char**args,int flags);
+Lstatic int zftp_getput(char*name,char**args,int flags);
+Lstatic int zftp_delete(UNUSED(char*name),char**args,UNUSED(int flags));
+Lstatic int zftp_mkdir(UNUSED(char*name),char**args,int flags);
+Lstatic int zftp_rename(UNUSED(char*name),char**args,UNUSED(int flags));
+Lstatic int zftp_quote(UNUSED(char*name),char**args,int flags);
+Lstatic void zfclose(int leaveparams);
+Lstatic int zftp_close(UNUSED(char*name),UNUSED(char**args),UNUSED(int flags));
+Lstatic void newsession(char*nm);
+Lstatic void switchsession(char*nm);
+Lstatic void freesession(Zftp_session sptr);
+Lstatic int zftp_session(UNUSED(char*name),char**args,UNUSED(int flags));
+Lstatic int zftp_rmsession(UNUSED(char*name),char**args,UNUSED(int flags));
+Lstatic int bin_zftp(char*name,char**args,UNUSED(Options ops),UNUSED(int func));
+Eextern int setup_(UNUSED(Module m));
+Eextern int features_(Module m,char***features);
+Eextern int enables_(Module m,int**enables);
+Eextern int boot_(UNUSED(Module m));
+Eextern int cleanup_(Module m);
+Eextern int finish_(UNUSED(Module m));
+E
+E#endif /* !have_Src_Modules_zftp_globals */

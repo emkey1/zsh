@@ -1,0 +1,12 @@
+E#ifndef have_Src_main_globals
+E#define have_Src_main_globals
+E
+E#ifdef __CYGWIN__
+L#ifdef __CYGWIN__
+Xcygwin_premain0
+Eextern mod_import_function void cygwin_premain0(int argc,char**argv,void*myself);
+E#endif /* __CYGWIN__ */
+L#endif /* __CYGWIN__ */
+Eextern int main(int argc,char**argv);
+E
+E#endif /* !have_Src_main_globals */

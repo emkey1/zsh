@@ -1,0 +1,12 @@
+/* Generated automatically */
+#ifndef have_Src_Modules_newuser_globals
+#define have_Src_Modules_newuser_globals
+
+extern int setup_(UNUSED(Module m));
+extern int features_(UNUSED(Module m),UNUSED(char***features));
+extern int enables_(UNUSED(Module m),UNUSED(int**enables));
+extern int boot_(UNUSED(Module m));
+extern int cleanup_(UNUSED(Module m));
+extern int finish_(UNUSED(Module m));
+
+#endif /* !have_Src_Modules_newuser_globals */

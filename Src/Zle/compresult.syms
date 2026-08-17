@@ -1,0 +1,41 @@
+E#ifndef have_Src_Zle_compresult_globals
+E#define have_Src_Zle_compresult_globals
+E
+Xinvcount
+Eextern mod_import_variable int invcount;
+Lstatic Cline cut_cline(Cline l);
+Lstatic char*cline_str(Cline l,int ins,int*csp,LinkList posl);
+Eextern char*unambig_data(int*cp,char**pp,char**ip);
+Lstatic int instmatch(Cmatch m,int*scs);
+Xhasbrpsfx
+Eextern mod_import_function int hasbrpsfx(Cmatch m,char*pre,char*suf);
+Eextern int do_ambiguous(void);
+Xztat
+Eextern mod_import_function int ztat(char*nam,struct stat*buf,int ls);
+Eextern void do_allmatches(UNUSED(int end));
+Xdo_single
+Eextern mod_import_function void do_single(Cmatch m);
+Xdo_menucmp
+Eextern mod_import_function void do_menucmp(int lst);
+Xaccept_last
+Eextern mod_import_function int accept_last(void);
+Lstatic int comp_mod(int v,int m);
+Eextern void do_ambig_menu(void);
+Eextern zlong list_lines(void);
+Eextern void comp_list(char*v);
+Xskipnolist
+Eextern mod_import_function Cmatch*skipnolist(Cmatch*p,int showall);
+Xcalclist
+Eextern mod_import_function int calclist(int showall);
+Xasklist
+Eextern mod_import_function int asklist(void);
+Lstatic int printlist(int over,CLPrintFunc printm,int showall);
+Xbld_all_str
+Eextern mod_import_function void bld_all_str(Cmatch all);
+Lstatic void iprintm(Cmgroup g,Cmatch*mp,UNUSED(int mc),UNUSED(int ml),int lastc,int width);
+Eextern int ilistmatches(UNUSED(Hookdef dummy),UNUSED(Chdata dat));
+Eextern int list_matches(UNUSED(Hookdef dummy),UNUSED(void*dummy2));
+Xinvalidate_list
+Eextern mod_import_function int invalidate_list(void);
+E
+E#endif /* !have_Src_Zle_compresult_globals */

@@ -1,0 +1,10 @@
+E#ifndef have_Src_sort_globals
+E#define have_Src_sort_globals
+E
+Lstatic int eltpcmp(const void*a,const void*b);
+Xzstrcmp
+Eextern mod_import_function int zstrcmp(const char*as,const char*bs,int sortflags);
+Xstrmetasort
+Eextern mod_import_function void strmetasort(char**array,int sortwhat,int*unmetalenp);
+E
+E#endif /* !have_Src_sort_globals */
