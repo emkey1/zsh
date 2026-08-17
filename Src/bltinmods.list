@@ -580,6 +580,7 @@
     }
 /* linked-in module `zsh/zftp' */
     /* depends on `zsh/net/tcp' */
+    add_dep("zsh/zftp", "zsh/net/tcp");
     {
         extern int setup_zshQszftp (Module);
         extern int boot_zshQszftp (Module);
@@ -733,6 +734,7 @@
     }
 /* linked-in module `zsh/deltochar' */
     /* depends on `zsh/zle' */
+    add_dep("zsh/deltochar", "zsh/zle");
     {
         extern int setup_zshQsdeltochar (Module);
         extern int boot_zshQsdeltochar (Module);

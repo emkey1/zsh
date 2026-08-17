@@ -120,6 +120,20 @@ for bin_mod in $bin_mods; do
 		rm -f $1
 		exit 1 ;;
 	esac
+	# Record the dependency for load_module(), not just in a comment.
+	# The $x_mods loop above emits add_dep() only for load=yes, and the
+	# $dyn_mods loop below it is inside #ifdef DYNAMIC, so a linked-in
+	# module with load=no gets no add_dep() from either -- and under
+	# --disable-dynamic there are no dynamic modules to pick up the slack.
+	# register_module() does not carry moddeps, so the dependency is lost
+	# entirely: `zmodload zsh/zftp' leaves zsh/net/tcp unbooted and the
+	# first ztcp call runs on its uninitialised statics.
+	# Skip the ones the first loop already covered; add_dep() ignores a
+	# duplicate, but there is no reason to emit one.
+	case "$x_mods" in
+	    *" $bin_mod "*) ;;
+	    *)	echo "    add_dep(\"$bin_mod\", \"$dep\");" ;;
+	esac
     done
     echo "    {"
     echo "        extern int setup_${q_bin_mod} (Module);"
