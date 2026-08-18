@@ -1514,7 +1514,7 @@ run_init_scripts(void)
 	    source("/etc/suid_profile");
     } else {
 #ifdef GLOBAL_ZSHENV
-	source(GLOBAL_ZSHENV);
+	aok_source_global(GLOBAL_ZSHENV);
 #endif
 
 	if (isset(RCS) && unset(PRIVILEGED))
@@ -1535,7 +1535,7 @@ run_init_scripts(void)
 	if (islogin) {
 #ifdef GLOBAL_ZPROFILE
 	    if (isset(RCS) && isset(GLOBALRCS))
-		    source(GLOBAL_ZPROFILE);
+		    aok_source_global(GLOBAL_ZPROFILE);
 #endif
 	    if (isset(RCS) && unset(PRIVILEGED))
 		sourcehome(".zprofile");
@@ -1543,7 +1543,7 @@ run_init_scripts(void)
 	if (interact) {
 #ifdef GLOBAL_ZSHRC
 	    if (isset(RCS) && isset(GLOBALRCS))
-		source(GLOBAL_ZSHRC);
+		aok_source_global(GLOBAL_ZSHRC);
 #endif
 	    if (isset(RCS) && unset(PRIVILEGED))
 		sourcehome(".zshrc");
@@ -1551,7 +1551,7 @@ run_init_scripts(void)
 	if (islogin) {
 #ifdef GLOBAL_ZLOGIN
 	    if (isset(RCS) && isset(GLOBALRCS))
-		source(GLOBAL_ZLOGIN);
+		aok_source_global(GLOBAL_ZLOGIN);
 #endif
 	    if (isset(RCS) && unset(PRIVILEGED))
 		sourcehome(".zlogin");

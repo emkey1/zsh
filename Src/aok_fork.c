@@ -3150,3 +3150,73 @@ void aok_child_init(void)
     aok_restore_pipestatus(pipes);
     aok_restore_underscore();
 }
+
+/* AOK: the GUEST decides where zsh's global rc files live, and it is usually not
+ * where this build was configured to look.
+ *
+ * configure baked in upstream's default -- /etc/zshenv, /etc/zprofile,
+ * /etc/zshrc, /etc/zlogin, /etc/zlogout -- which is what a Fedora or openSUSE
+ * rootfs uses. Debian, Devuan, Arch and Gentoo all build with
+ * --enable-etcdir=/etc/zsh instead, so on a Devuan root the compiled-in paths
+ * name files that do not exist. Measured, zsh installed:
+ *
+ *     /etc/zsh/{zshenv,zprofile,zshrc,zlogin,zlogout}   all five present
+ *     /etc/zshrc, /etc/zshenv                           absent
+ *
+ * The guest's own /usr/bin/zsh read all of it and native zsh read none of it,
+ * which is exactly the host-vs-guest divergence the native shims exist to
+ * remove. It surfaced as native zsh having one fewer fpath entry than the
+ * guest's zsh and missing the `:completion:*:sudo:*' style /etc/zsh/zshrc sets.
+ *
+ * PROBED, NOT HARDCODED, because AOK is used with rootfs images it does not
+ * ship. Devuan and Alpine are the official two; someone's Fedora or Void root is
+ * equally valid and has to keep working. So the etcdir spelling wins only if it
+ * EXISTS, and the compiled-in path is the fallback -- a root using upstream's
+ * layout therefore behaves exactly as it does today, including a root with no
+ * global rc files at all, which is what an image without zsh installed looks
+ * like.
+ *
+ * NEVER BOTH. A root carrying /etc/zsh/zshrc and /etc/zshrc gets the /etc/zsh
+ * one, which is what its own zsh would do, since a distro only creates that
+ * directory when it configured zsh to read from it.
+ *
+ * The "zsh/" goes in front of the BASENAME rather than replacing the whole
+ * directory, so a build configured with a prefix keeps that prefix.
+ *
+ * AOK_ZSH_ETCDIR overrides the directory outright; set it to /etc to force the
+ * flat layout. It is what lets both branches be tested on one rootfs, and it is
+ * read from the guest environment like every other AOK knob.
+ *
+ * Lives here rather than in init.c because builtin.c needs it too, for
+ * GLOBAL_ZLOGOUT, and declared through aok_fork.h rather than zsh's `/**\/`
+ * marker so that init.epro and builtin.epro stay byte-for-byte what makepro.awk
+ * would produce for upstream -- the same arrangement aok_redir_text uses. */
+void aok_source_global(const char *flat)
+{
+    const char *base, *dir;
+    char path[PATH_MAX];
+    struct stat st;
+
+    if (flat == NULL || *flat == '\0')
+	return;
+
+    base = strrchr(flat, '/');
+    base = base ? base + 1 : flat;
+
+    dir = getenv("AOK_ZSH_ETCDIR");
+    if (dir != NULL && *dir != '\0') {
+	if (snprintf(path, sizeof(path), "%s/%s", dir, base) < (int) sizeof(path))
+	    source(path);
+	return;
+    }
+
+    if (base != flat &&
+	snprintf(path, sizeof(path), "%.*szsh/%s",
+		 (int) (base - flat), flat, base) < (int) sizeof(path) &&
+	stat(path, &st) == 0 && S_ISREG(st.st_mode)) {
+	source(path);
+	return;
+    }
+
+    source(flat);
+}

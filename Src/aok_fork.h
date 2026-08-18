@@ -120,4 +120,10 @@ void aok_snapshot_keymaps(void);
 void aok_forget_keymaps(void);
 void aok_emit_keymaps(FILE *out);
 
+/* AOK: source a global rc file from wherever the guest rootfs actually keeps it
+ * -- /etc/zsh/NAME when that exists, the compiled-in GLOBAL_* path otherwise.
+ * Used by init.c for zshenv/zprofile/zshrc/zlogin and by builtin.c for zlogout.
+ * See the block comment on the definition in aok_fork.c. */
+void aok_source_global(const char *flat);
+
 #endif /* AOK_FORK_H */

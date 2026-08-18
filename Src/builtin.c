@@ -31,6 +31,7 @@
 #define _GNU_SOURCE 1
 
 #include "zsh.mdh"
+#include "aok_fork.h"
 #include "builtin.pro"
 
 #include <math.h>
@@ -6027,7 +6028,7 @@ zexit(int val, enum zexit_t from_where)
 	    sourcehome(".zlogout");
 #ifdef GLOBAL_ZLOGOUT
 	    if (isset(RCS) && isset(GLOBALRCS))
-		source(GLOBAL_ZLOGOUT);
+		aok_source_global(GLOBAL_ZLOGOUT);
 #endif
 	}
     }
