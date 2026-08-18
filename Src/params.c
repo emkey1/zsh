@@ -29,6 +29,9 @@
 
 #include "zsh.mdh"
 #include "params.pro"
+/* AOK: randomgetfn and randomsetfn keep the seed/draw pair a re-launched
+ * subshell needs in order to continue this shell's $RANDOM stream. */
+#include "aok_fork.h"
 
 #include "version.h"
 #ifdef CUSTOM_PATCHLEVEL
@@ -4542,6 +4545,10 @@ poundgetfn(UNUSED(Param pm))
 zlong
 randomgetfn(UNUSED(Param pm))
 {
+    /* AOK: counted, so that a re-launched subshell can replay the same number
+     * of draws from the same seed and continue its parent's stream. rand()'s
+     * state is in libc, which a fork copies and a fresh process does not. */
+    aok_random_draws++;
     return rand() & 0x7fff;
 }
 
@@ -4551,7 +4558,12 @@ randomgetfn(UNUSED(Param pm))
 void
 randomsetfn(UNUSED(Param pm), zlong v)
 {
-    srand((unsigned int)v);
+    /* AOK: the new seed, and the draw count back to zero -- the pair a
+     * re-launched subshell is handed so it can rebuild this generator state.
+     * See the comment on randomgetfn above and aok_fork.c. */
+    aok_random_seed = (unsigned int)v;
+    aok_random_draws = 0;
+    srand(aok_random_seed);
 }
 
 /* Function to get value for special parameter `SECONDS' */

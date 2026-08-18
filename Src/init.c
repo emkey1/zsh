@@ -1123,7 +1123,14 @@ setupvals(char *cmd, char *runscript, char *zsh_name)
     termflags = TERM_UNKNOWN;
     curjob = prevjob = coprocin = coprocout = -1;
     zgettime_monotonic_if_available(&shtimer);	/* init $SECONDS */
-    srand((unsigned int)(shtimer.tv_sec + shtimer.tv_nsec)); /* seed $RANDOM */
+    /* AOK: recorded as well as used, because $RANDOM's state lives in libc and
+     * a re-launched subshell gets a fresh libc rather than a copy of this one.
+     * The startup seed has to be in the pair for the same reason an explicit
+     * `RANDOM=42` does: a shell that never assigned RANDOM still has a stream,
+     * and a fork of it continues that stream. See aok_fork.c. */
+    aok_random_seed = (unsigned int)(shtimer.tv_sec + shtimer.tv_nsec);
+    aok_random_draws = 0;
+    srand(aok_random_seed);			/* seed $RANDOM */
 
     /* Set default path */
     path    = (char **) zalloc(sizeof(*path) * 5);

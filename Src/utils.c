@@ -469,8 +469,33 @@ nicechar_sel(int c, int quotable)
 	*s++ = 'M';
 	*s++ = '-';
 	c &= 0x7f;
-	if(ZISPRINT(c))
+	if(ZISPRINT(c)) {
+	    /* AOK: the same $'...' hazard as the `\C-\\` doubling further
+	     * down, one branch earlier and for a wider set of bytes. Masking
+	     * bit 7 off turns 0xdc into a bare `\` and 0xa7 into a bare `'`,
+	     * and this branch used to write whichever it got straight into the
+	     * buffer -- so a caller building a $'...' string got `$'\M-\'`,
+	     * whose backslash escapes the closing quote, or `$'\M-''`, which
+	     * closes the quote early. Either way the line is unparseable.
+	     *
+	     * That matters more here than upstream because aok_fork.c re-reads
+	     * typeset -p's output in another shell: one such line aborts the
+	     * sourced state, so the subshell silently starts with only the part
+	     * of its parent that was emitted before the offending parameter.
+	     * `export LC_ALL=C; v='<a7 byte>'` is enough -- 0xa7 is the second
+	     * byte of § in UTF-8, so any Latin-1 or mis-decoded text can carry
+	     * it.
+	     *
+	     * Escaping is confined to `quotable` because that is exactly the
+	     * caller that is building $'...'; the `^X`-style display form the
+	     * other callers want must keep showing the byte as it is. This
+	     * closes the class rather than the two bytes: every character that
+	     * is special INSIDE $'...' is escaped, not just the two that were
+	     * measured. */
+	    if (quotable && (c == '\\' || c == '\''))
+		*s++ = '\\';
 	    goto done;
+	}
     }
     if (c == 0x7f) {
 	if (quotable) {

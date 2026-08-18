@@ -67,4 +67,11 @@ extern __thread int aok_inherited_ntraps;
  * the first sublist execlist runs afterwards. */
 extern __thread int aok_relaunch_incmd;
 
+/* The $RANDOM stream, as a seed and a draw count, so that a re-launched child
+ * can rebuild libc's generator state -- which a real fork copies and this one
+ * cannot see. Maintained by init.c (the startup seed) and by randomsetfn and
+ * randomgetfn in params.c; replayed by aok_child_init. See aok_fork.c. */
+extern __thread unsigned int aok_random_seed;
+extern __thread zlong aok_random_draws;
+
 #endif /* AOK_FORK_H */

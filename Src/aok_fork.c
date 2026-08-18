@@ -132,6 +132,32 @@ __thread int aok_inherited_ntraps = 0;
 /**/
 __thread int aok_relaunch_incmd = 0;
 
+/* Where the $RANDOM sequence has got to.
+ *
+ * $RANDOM is libc's rand(), so its state lives in libc and a fork copies it
+ * for free. A re-launched child gets a fresh libc, which is why a parent that
+ * had done `RANDOM=42` for a reproducible run handed every subshell a
+ * different stream: `RANDOM=42; print $RANDOM $RANDOM` and `RANDOM=42; print
+ * $(print $RANDOM $RANDOM)` disagreed here and agree on a real fork.
+ *
+ * There is no portable way to READ libc's generator state, so this records
+ * what it would take to rebuild it: the last seed and how many numbers have
+ * been drawn since. randomsetfn and randomgetfn in params.c keep the pair up
+ * to date, init.c records the startup seed, and aok_child_init replays the
+ * pair with srand() and that many rand() calls -- which is exact, because
+ * srand+rand is deterministic. The replay costs one rand() per draw the parent
+ * ever made; rand() is a handful of nanoseconds, so a shell that has read
+ * $RANDOM a million times pays about five milliseconds per subshell and every
+ * realistic shell pays nothing measurable.
+ *
+ * Replaying in C rather than emitting `RANDOM=42` plus N reads into the state
+ * is not an optimisation: a `$RANDOM` in shell text is a command, and N of
+ * them would be N commands for the child to parse and run. */
+/**/
+__thread unsigned int aok_random_seed = 0;
+/**/
+__thread zlong aok_random_draws = 0;
+
 /* ------------------------------------------------------------ the state script
  *
  * Almost all of it is produced by running zsh code in the parent with fd 1
@@ -435,8 +461,25 @@ static const char aok_state_script[] =
  * storage and `typeset -aT CDPATH cdpath=( ... )` sets both, so naming CDPATH
  * as well would have added a line per pair to every subshell to assign what had
  * just been assigned. */
+/* OPTIND is deliberately NOT here, and its absence is not an oversight: it is
+ * the one special this script CANNOT read. zsh scopes OPTIND per function, so
+ * `typeset -p OPTIND` inside the anonymous function wrapping this script
+ * reports the function's fresh 1 rather than the shell's value -- which real
+ * zsh does too, `zsh -f -c 'OPTIND=7; () { typeset -p OPTIND }'` prints 1 on
+ * the host as well. Listing it therefore did worse than nothing: every child
+ * was handed `typeset -g -i10 OPTIND=1`, so a parent halfway through a getopts
+ * loop did not merely fail to pass OPTIND on, it had the child's own value
+ * overwritten with 1. It is emitted from C instead, by aok_emit_specials.
+ *
+ * TRY_BLOCK_ERROR and TRY_BLOCK_INTERRUPT ARE here. They were dropped on the
+ * grounds that continuing a `try` block is what a re-launched child cannot do,
+ * which is true of the block and false of the flag: reading $TRY_BLOCK_ERROR
+ * from a subshell inside an `always` block is ordinary usage, `{ ((1/0)) }
+ * always { print $(print $TRY_BLOCK_ERROR) }` answers 0 on a real fork, and
+ * without them the child fell back to the -1 that means "no try block here". */
 "  __aok_sp=( IFS WORDCHARS KEYBOARD_HACK histchars SHLVL POSTEDIT HISTSIZE \\\n"
-"      SAVEHIST FUNCNEST LINES COLUMNS ZLE_RPROMPT_INDENT OPTIND OPTARG \\\n"
+"      SAVEHIST FUNCNEST LINES COLUMNS ZLE_RPROMPT_INDENT OPTARG \\\n"
+"      TRY_BLOCK_ERROR TRY_BLOCK_INTERRUPT \\\n"
 "      NULLCMD READNULLCMD WATCH watch PS1 PS2 PS3 PS4 RPS1 RPS2 SPROMPT \\\n"
 "      path cdpath fpath manpath mailpath psvar fignore module_path )\n"
 "  __aok_pk=( \"${(@k)parameters}\" )\n"
@@ -456,6 +499,36 @@ static const char aok_state_script[] =
 "  (( $#__aok_hv )) && typeset -g +H -- \"${(@)__aok_hv}\" 2>/dev/null\n"
 "  (( $#__aok_pv )) && typeset -p -- \"${(@)__aok_pv}\"\n"
 "  (( $#__aok_fn )) && print -rl -- \"${(@)__aok_fn}\"\n"
+/* The ZLE widget table, which did not cross at all: a re-launched child got a
+ * pristine zle, so the parent's `zle -N`, `zle -A` and `zle -C` widgets were
+ * absent and `bindkey` answered `undefined-key` for every key bound to one.
+ * That is not only an interactive nicety -- compinit registers ~400 widgets,
+ * and a completion function that reaches for one inside a subshell found it
+ * missing.
+ *
+ * `zle -lL` is the whole fix because zle's own listing is already in the form
+ * that recreates it: `-l` lists the USER-defined widgets and not the ~390
+ * builtin ones (so this costs nothing in a shell that has not defined any),
+ * and `-L` writes each as the `zle -N`/`zle -C` command that would define it.
+ * A `zle -A` alias flattens to a direct `zle -N old new`, which is the same
+ * widget by another route rather than a lost one.
+ *
+ * The position is load-bearing at both ends. It is AFTER the function block
+ * because every widget names a shell function that has to exist first, and it
+ * is after the `zmodload -L` at the top of this script because `zle` is a
+ * builtin of zsh/zle and the child has to have loaded the module before it can
+ * run the line. The `zmodload -e` guard is rule (12)'s: asking zle anything
+ * would LOAD zsh/zle, and a shell that never used zle must not be handed one
+ * -- and must not start telling its children to load it either.
+ *
+ * What this does not carry is the KEYMAPS. `bindkey -L` prints the whole main
+ * keymap rather than the difference from the default, so replaying it would
+ * cost a few hundred lines on every subshell of an interactive shell to say
+ * almost nothing; a key bound to a widget the parent defined now finds the
+ * widget, but a key the parent REbound still reads as its default in the
+ * child. That is a narrower gap than the one being closed and it is recorded
+ * rather than fixed. */
+"  zmodload -e zsh/zle && zle -lL\n"
 "  functions -M\n"
 "  alias -L; alias -gL; alias -sL\n"
 /* Rule (12) again. `zstyle` is an AUTOLOADED builtin of zsh/zutil, so calling
@@ -830,8 +903,8 @@ static __thread int aok_sourcing_state = 0;
  * the state is being parsed. */
 static const char *const aok_script_words[] = {
     "emulate", "setopt", "local", "typeset", "zmodload", "print",
-    "functions", "alias", "zstyle", "hash", "continue", "return",
-    "builtin", "unsetopt", "unset", "trap", "autoload", NULL
+    "functions", "alias", "zstyle", "hash", "continue", "return", "zle",
+    "builtin", "unsetopt", "unset", "trap", "autoload", "disable", NULL
 };
 
 static __thread GetNodeFunc aok_real_shfunc_getnode;
@@ -886,7 +959,16 @@ static void aok_undisable_node(HashNode hn, UNUSED(int flags))
  * no_aliases` first line (rule 1). That line is shell text, so it can only
  * take effect once something has parsed it; this is the lexer's own flag, set
  * before the first byte of the state is read, and it holds even if the line
- * that was supposed to set the option never ran. */
+ * that was supposed to set the option never ran.
+ *
+ * The getnode save is guarded rather than unconditional. This pair is not
+ * supposed to nest -- a shell either sources a state or produces one, never
+ * both at once, and a fork out of either is refused -- but if it ever did,
+ * saving the already-swapped pointer into aok_real_shfunc_getnode would make
+ * aok_shfunc_getnode call itself forever, which is a worse failure than the
+ * one being guarded against. The same guard covers the state escaping through
+ * a non-local exit and leaving the armour on: the next call then leaves the
+ * real getnode where it is instead of losing it. */
 static void aok_state_armour_on(int *onoaliases)
 {
     *onoaliases = noaliases;
@@ -894,8 +976,10 @@ static void aok_state_armour_on(int *onoaliases)
     aok_ndisabled = 0;
     scanhashtable(builtintab, 0, 0, 0, aok_undisable_node, 0);
     scanhashtable(reswdtab, 0, 0, 0, aok_undisable_node, 0);
-    aok_real_shfunc_getnode = shfunctab->getnode;
-    shfunctab->getnode = aok_shfunc_getnode;
+    if (shfunctab->getnode != aok_shfunc_getnode) {
+	aok_real_shfunc_getnode = shfunctab->getnode;
+	shfunctab->getnode = aok_shfunc_getnode;
+    }
 }
 
 static void aok_state_armour_off(int onoaliases)
@@ -1554,14 +1638,32 @@ static void aok_emit_one_float(HashNode hn, UNUSED(int flags))
     /* `typeset -F f` with no value leaves the parameter declared and unset,
      * and the getter answers 0 for it -- so writing `f=0` here would hand the
      * child a value its parent never had. The declaration alone is what
-     * crosses, which is also what typeset -p writes for such a parameter.
-     *
-     * Inf and NaN are left the same way: convfloat spells them "Inf" and
-     * "NaN", which the child's arithmetic reads as unset parameters, i.e. 0.
-     * Declared-but-not-assigned is the honest answer for a value this
-     * transport cannot carry. */
-    if ((pmf & PM_UNSET) || !isfinite(d)) {
+     * crosses, which is also what typeset -p writes for such a parameter. */
+    if (pmf & PM_UNSET) {
 	fprintf(aok_float_out, " -- %s\n", hn->nam);
+	return;
+    }
+    /* Inf and NaN used to be emitted the same way -- declared and unset, on
+     * the grounds that this transport could not carry them -- and the effect
+     * was that a parent holding Inf handed the child a 0. Silently, and in the
+     * direction that turns an overflow into an ordinary small number, so a
+     * subshell's arithmetic disagreed with its parent's without anything
+     * saying so.
+     *
+     * It turns out the transport can carry them after all. zsh's arithmetic
+     * reads the words `Inf` and `NaN` as those values (math.c's number lexer
+     * hands the text to strtod, which recognises both), so `typeset -g -F --
+     * f=Inf` round-trips exactly what convfloat prints -- `$(( 1/f ))` is 0 in
+     * the child as it is in the parent, and `$(( n != n ))` is 1 for the NaN.
+     * The `--` already on the line is what makes the negative case safe:
+     * `f=-Inf` is one word beginning with `f`, not an option.
+     *
+     * Nothing is said about the NaN's payload or sign bit. A real fork copies
+     * those and this does not, but no zsh-level operation can observe them, so
+     * the difference is not reachable from a script. */
+    if (!isfinite(d)) {
+	fprintf(aok_float_out, " -- %s=%s\n", hn->nam,
+		isnan(d) ? "NaN" : (signbit(d) ? "-Inf" : "Inf"));
 	return;
     }
     n = snprintf(val, sizeof(val), "%.17g", d);
@@ -1592,6 +1694,131 @@ static void aok_emit_floats(int fd)
     aok_float_out = out;
     scanhashtable(paramtab, 0, 0, 0, aok_emit_one_float, 0);
     aok_float_out = NULL;
+    fclose(out);
+}
+
+/* A word the child must re-read as exactly these bytes, single-quoted the way
+ * aok_quote_words does it and for the same reason: single quotes are the one
+ * form no further expansion can touch, and a builtin, reserved word, alias or
+ * function name is the user's to choose. */
+static void aok_emit_quoted(FILE *out, const char *w)
+{
+    fputc('\'', out);
+    for (; *w; w++) {
+	if (*w == '\'')
+	    fputs("'\\''", out);
+	else
+	    fputc(*w, out);
+    }
+    fputc('\'', out);
+}
+
+/* The two specials the state SCRIPT cannot describe, emitted here instead.
+ *
+ * OPTIND, because zsh gives every function its own copy: the script runs
+ * inside an anonymous function (see the block comment on aok_state_script for
+ * why it has to), so `typeset -p OPTIND` in there reports the function's fresh
+ * 1 and not the shell's value. Real zsh does the same -- `zsh -f -c 'OPTIND=7;
+ * () { typeset -p OPTIND }'` prints 1 on the host too -- so this is not a
+ * quirk of the port and no rearrangement inside the script can fix it. Reading
+ * `zoptind` from C is reading the same storage without the function scope in
+ * the way. It matters for the shape getopts is actually used in: a parent
+ * halfway through `while getopts ab: opt` had every child told OPTIND=1, so a
+ * subshell that continued the loop restarted it.
+ *
+ * SECONDS, because it is a clock rather than a value. The old note called it
+ * "what the child measures for itself", but that is not what a fork does:
+ * SECONDS is an offset from `shtimer`, a fork copies shtimer, and so a forked
+ * child reports the PARENT's elapsed time and remembers an explicit
+ * `SECONDS=1000`. shtimer itself crosses in the environment and is installed
+ * by C in the child (see aok_inherit_string), which is exact -- the alternative
+ * of emitting `SECONDS=<value>` as shell text would have re-based the clock at
+ * the moment the child ran the line, losing the spawn latency. What has to be
+ * said HERE is only the parameter's TYPE, since `typeset -F SECONDS` is a real
+ * and load-bearing thing to have done: it switches the parameter to the
+ * floating-point getter, and a child that did not know would answer whole
+ * seconds to code written for fractions. */
+static void aok_emit_specials(int fd)
+{
+    FILE *out = fdopen(dup(fd), "w");
+    Param pm;
+
+    if (!out)
+	return;
+    fprintf(out, "builtin typeset -g -i10 OPTIND=%lld\n", (long long) zoptind);
+
+    pm = (Param) paramtab->getnode(paramtab, "SECONDS");
+    if (pm) {
+	int pmf = pm->node.flags;
+	const char *type = (pmf & PM_FFLOAT) ? "-F" :
+			   (pmf & PM_EFLOAT) ? "-E" : NULL;
+
+	if (type) {
+	    fprintf(out, "builtin typeset -g %s", type);
+	    if (pm->base > 0)
+		fprintf(out, " %d", pm->base);
+	    fputs(" SECONDS\n", out);
+	}
+    }
+    fclose(out);
+}
+
+/* The DISABLED bits, which did not cross at all: `disable print` in the parent
+ * left `print` working in every subshell, where a real fork inherits the bit
+ * and answers "command not found". Silent, and in the direction that runs code
+ * the user had switched off.
+ *
+ * THE POSITION IS THE WHOLE DESIGN. This has to be the last thing the child
+ * does, because the state is itself made of builtins: `builtin`, `typeset`,
+ * `print`, `zmodload`, `alias`, `hash`, `zstyle`, `setopt` and `disable`
+ * itself are all words the state runs, and a `disable` applied early would
+ * break the rest of the state that emitted it. That is the same reason
+ * aok_state_armour_on CLEARS every DISABLED bit while a shell serialises --
+ * and it is why re-emitting them early would not merely fail here, it would
+ * re-break the child's own serialiser on the child's next nested subshell.
+ *
+ * One line per table rather than one per name, for a reason that is not
+ * brevity: `disable builtin` and `disable disable` are legal, and emitted
+ * name-by-name the first of them would have stopped the lines after it from
+ * running. A single command applies the whole set at once, so a set that
+ * includes the words this line is made of still lands intact. builtintab goes
+ * LAST for the same reason relative to the other tables.
+ *
+ * `disable -p`, which switches off pattern characters rather than table
+ * entries, keeps its own list inside builtin.c and is not carried. */
+static void aok_emit_disabled_table(FILE *out, HashTable ht, const char *opt)
+{
+    int i, first = 1;
+
+    for (i = 0; i < ht->hsize; i++) {
+	HashNode hn;
+
+	for (hn = ht->nodes[i]; hn; hn = hn->next) {
+	    if (!(hn->flags & DISABLED))
+		continue;
+	    if (first) {
+		fprintf(out, "builtin disable %s--", opt);
+		first = 0;
+	    }
+	    fputc(' ', out);
+	    aok_emit_quoted(out, hn->nam);
+	}
+    }
+    if (!first)
+	fputc('\n', out);
+}
+
+static void aok_emit_disabled(int fd)
+{
+    FILE *out = fdopen(dup(fd), "w");
+
+    if (!out)
+	return;
+    aok_emit_disabled_table(out, shfunctab, "-f ");
+    aok_emit_disabled_table(out, reswdtab, "-r ");
+    aok_emit_disabled_table(out, aliastab, "-a ");
+    aok_emit_disabled_table(out, sufaliastab, "-s ");
+    aok_emit_disabled_table(out, builtintab, "");
     fclose(out);
 }
 
@@ -1626,6 +1853,13 @@ static void aok_emit_epilogue(int fd)
      * "NOPE -g AOK_ZSH_STATE_OK=1" instead of the value. An assignment has no
      * command word to alias and no builtin to shadow, and the state is sourced
      * at the top level, so it is global without having to say so. */
+    /* The DISABLED bits, here and nowhere earlier -- see aok_emit_disabled for
+     * why "last" is the whole point. Flushed first because that function writes
+     * through a descriptor of its own, and only before the sentinel so that a
+     * `disable` line which somehow fails still shows up as a state that did not
+     * finish rather than as silence. */
+    fflush(out);
+    aok_emit_disabled(fileno(out));
     fprintf(out, "%s=1\n", AOK_VAR_OK);
     fclose(out);
 }
@@ -1714,12 +1948,38 @@ void aok_spawn_close(struct aok_spawn *sp, int fd)
  *              either, even though it is assignable: every command run while
  *              the state is sourced overwrites it, so like `$?` it has to be
  *              restored from C after the last of them.
+ *   shtimer    the origin $SECONDS is measured from. A fork copies it, so a
+ *              forked child reports the PARENT's elapsed time and remembers an
+ *              explicit `SECONDS=1000`; here every child restarted at 0. The
+ *              two halves of the timespec travel as integers and are installed
+ *              verbatim, which is exact -- emitting `SECONDS=<value>` as shell
+ *              text would have re-based the clock when the child ran the line
+ *              and quietly lost the spawn latency. `typeset -F SECONDS` is
+ *              carried separately by aok_emit_specials, since the TYPE is
+ *              shell-visible state and this is not.
+ *   $RANDOM    as a seed and a draw count -- see aok_random_seed. The stream
+ *              lives in libc, which a fork copies and a spawn does not.
+ *   `$_`       the last argument of the previous command, which crosses a fork
+ *              like any other memory. It cannot go in the state script for the
+ *              same reason `$?` cannot: every line of the state sets it, and
+ *              zsh will not let a script assign it at all (`_` is
+ *              nullstrsetfn). It is LAST in the string because it is the only
+ *              field whose value is arbitrary user text -- a path, a filename,
+ *              anything with a `/` in it -- so it gets the whole remainder
+ *              rather than a delimiter it could contain.
  *
- * One variable rather than four: the child validates the whole thing once,
+ * One variable rather than eight: the child validates the whole thing once,
  * against the same spawner check `$$` gets. */
 static char *aok_inherit_string(zlong subshell, int flags)
 {
-    size_t cap = 128 + (size_t) numpipestats * 12, len;
+    /* UNmetafied, because this is going into the environment and the child
+     * metafies everything it imports from there. Handing over zunderscore as
+     * it is stored made the child metafy an already-metafied string, so a `$_`
+     * holding the byte 0x83 -- which is zsh's own Meta character, and the
+     * second byte of plenty of ordinary UTF-8 -- came back two bytes long. */
+    const char *under = zunderscore ? unmetafy(dupstring(zunderscore), NULL)
+				    : "";
+    size_t cap = 192 + (size_t) numpipestats * 12 + strlen(under), len;
     char *s = (char *) zalloc(cap);
     int i;
 
@@ -1733,13 +1993,18 @@ static char *aok_inherit_string(zlong subshell, int flags)
      * and inventing a sixth AOK_ZSH_* variable to carry one bit would mean a
      * second thing for the child to check and a second thing to strip out of
      * the environment of every program it runs. */
-    len = (size_t) snprintf(s, cap, "%s=%lld/%lld/%lld/%d/", AOK_VAR_INHERIT,
+    len = (size_t) snprintf(s, cap, "%s=%lld/%lld/%lld/%d/%lld,%lld/%u,%lld/",
+			    AOK_VAR_INHERIT,
 			    (long long) lastpid, (long long) ppid,
 			    (long long) subshell,
-			    (flags & AOK_SUB_INCMD) ? 1 : 0);
+			    (flags & AOK_SUB_INCMD) ? 1 : 0,
+			    (long long) shtimer.tv_sec,
+			    (long long) shtimer.tv_nsec,
+			    aok_random_seed, (long long) aok_random_draws);
     for (i = 0; i < numpipestats && len + 13 < cap; i++)
 	len += (size_t) snprintf(s + len, cap - len, i ? ",%d" : "%d",
 				 pipestats[i]);
+    snprintf(s + len, cap - len, "/%s", under);
     return s;
 }
 
@@ -1834,6 +2099,60 @@ static void aok_write_state(int fd, int flags)
     sigemptyset(&sa.sa_mask);
     sigaction(SIGPIPE, &sa, &old);
 
+    /* No SIGNAL trap may run while a state is being produced, for the same
+     * reason no DEBUG or ZERR trap may -- and this is the asynchronous half of
+     * a class the file had only closed for the synchronous one.
+     *
+     * aok_run_state_script points fd 1 at the state pipe. A trap that fires
+     * while it is doing so therefore writes ITS output into the state, and the
+     * state is shell text: the child sourced the trap's words as commands.
+     * `TRAPUSR1() { print T }; kill -USR1 $$; /bin/true; print AFTER` was
+     * enough -- the T never reached the terminal, the child died partway
+     * through reading a state it could not parse, the parent then wrote the
+     * rest of it into a broken pipe, and the re-launch retried, so a shell that
+     * should have printed "T" and "AFTER" printed a page of "write error:
+     * broken pipe" and hung. Whether it hung or merely lost the trap depended
+     * on where in the script the signal landed, i.e. on timing.
+     *
+     * DEFER rather than suppress, because a fork does not lose the signal:
+     * zsh's own trap queue holds it and unqueue_traps() below replays it. The
+     * replay is deliberately AFTER the descriptor has been put back and after
+     * aok_serialising is clear, so the trap runs in a shell that looks normal
+     * to it -- output on the real stdout, and free to fork if its body wants
+     * to. Ordering against the oracle survives: real zsh runs the trap before
+     * the external command's output appears, and so does this, because the
+     * state is written before the child gets going.
+     *
+     * That also closes the fork half of the same window. A trap body is
+     * arbitrary user code, so it can contain a command substitution; run from
+     * inside the serialiser, that fork would have been refused by
+     * aok_serialising and the trap would have failed. Deferred, it runs
+     * afterwards and forks normally.
+     *
+     * It has to be the TRAP queue and not the SIGNAL queue, which is the part
+     * that is not obvious and cost a build to learn. queue_signals() looks
+     * like the right tool and is not: execcmd calls dont_queue_signals()
+     * before every builtin (exec.c, just above its execbuiltin call), which
+     * zeroes queueing_enabled and REPLAYS the queue -- and the state script is
+     * builtins from end to end, so the first `print` in it released the signal
+     * and ran the trap exactly where it must not. queue_traps() sets a
+     * different flag, which handletrap() checks and nothing in exec.c touches.
+     *
+     * TRAPSASYNC is masked for the one call rather than honoured. The option
+     * means "run traps while WAITING for a job rather than deferring them",
+     * which is a statement about waiting; here the deferral is not a policy
+     * choice but the only way the trap's own output can reach the terminal
+     * instead of the state. opts[] is put back immediately, before
+     * aok_emit_options reads it, so the child still gets the parent's real
+     * setting. */
+    {
+	int otrapsasync = opts[TRAPSASYNC];
+
+	opts[TRAPSASYNC] = 0;
+	queue_traps(0);
+	opts[TRAPSASYNC] = otrapsasync;
+    }
+
     /* AOK_ZSH_NO_STATE is a measurement knob, not a feature: it spawns the
      * child with an EMPTY state so the fixed cost of the spawn can be told
      * apart from the cost of serialising. A shell run with it set is wrong on
@@ -1853,6 +2172,7 @@ static void aok_write_state(int fd, int flags)
 	aok_emit_tables(fd);
 	aok_emit_exit_trap(fd);
 	aok_emit_floats(fd);
+	aok_emit_specials(fd);
 	aok_emit_traps(fd, flags);
 	aok_emit_options(fd);
     }
@@ -1872,6 +2192,7 @@ static void aok_write_state(int fd, int flags)
 	aok_emit_tables(2);
 	aok_emit_exit_trap(2);
 	aok_emit_floats(2);
+	aok_emit_specials(2);
 	aok_emit_traps(2, flags);
 	aok_emit_options(2);
 	aok_emit_epilogue(2);
@@ -1882,6 +2203,9 @@ static void aok_write_state(int fd, int flags)
     aok_serialising--;
 
     sigaction(SIGPIPE, &old, NULL);
+    /* Last, so that anything the queue replays sees a shell with its own
+     * stdout back and nothing refusing to fork. */
+    unqueue_traps();
 }
 
 /* Spawn a re-launched zsh running CMDTEXT with this shell's state.
@@ -2165,10 +2489,15 @@ done:
  * pipestatus is not applied here. Every command sourced from the state script
  * overwrites it, so the value is handed back to the caller and restored at the
  * end, next to `$?` and for the identical reason. */
+/* `$_` as it arrived, held between aok_adopt_inherit and the bottom of
+ * aok_child_init -- see the comment where it is parsed. */
+static __thread char *aok_inherit_underscore;
+
 static char *aok_adopt_inherit(int validated)
 {
     char *raw, *value, *end, *pipes = NULL;
-    long long bang, parent, subshell, incmd;
+    long long bang, parent, subshell, incmd, shsec, shnsec, rdraws;
+    unsigned long long rseed;
 
     raw = getsparam(AOK_VAR_INHERIT);
     if (!raw)
@@ -2200,11 +2529,59 @@ static char *aok_adopt_inherit(int validated)
     if (bang < 0 || parent < 0 || subshell < 0 || incmd < 0)
 	goto done;
 
+    /* shtimer, as the two halves of the timespec. Installed rather than
+     * converted: SECONDS is the difference between now and this origin, so
+     * copying the origin is what makes the child's clock the parent's. */
+    raw = end + 1;
+    errno = 0;
+    shsec = strtoll(raw, &end, 10);
+    if (end == raw || *end != ',' || errno != 0)
+	goto done;
+    raw = end + 1;
+    errno = 0;
+    shnsec = strtoll(raw, &end, 10);
+    if (end == raw || *end != '/' || errno != 0 || shnsec < 0)
+	goto done;
+
+    /* The $RANDOM stream: a seed and how many numbers were drawn from it. */
+    raw = end + 1;
+    errno = 0;
+    rseed = strtoull(raw, &end, 10);
+    if (end == raw || *end != ',' || errno != 0)
+	goto done;
+    raw = end + 1;
+    errno = 0;
+    rdraws = strtoll(raw, &end, 10);
+    if (end == raw || *end != '/' || errno != 0 || rdraws < 0)
+	goto done;
+
     lastpid = (zlong) bang;
     ppid = (zlong) parent;
     zsh_subshell = (zlong) subshell;
     aok_relaunch_incmd = incmd != 0;
-    pipes = ztrdup(end + 1);
+    shtimer.tv_sec = (time_t) shsec;
+    shtimer.tv_nsec = (long) shnsec;
+    /* Rebuild libc's generator by replaying the parent's draws. Exact, because
+     * srand+rand is deterministic; see aok_random_seed for the cost. */
+    aok_random_seed = (unsigned int) rseed;
+    aok_random_draws = (zlong) rdraws;
+    srand(aok_random_seed);
+    while (rdraws-- > 0)
+	(void) rand();
+
+    /* The pipestatus list, then `$_` -- which is the rest of the string,
+     * whatever it contains. `$_` is held rather than installed here: this runs
+     * BEFORE the state is sourced and every line of the state sets `_` to its
+     * own last word, so it goes on at the bottom of aok_child_init with `$?`
+     * and $pipestatus, for the same reason those do. */
+    raw = end + 1;
+    end = strchr(raw, '/');
+    if (end) {
+	*end = '\0';
+	zsfree(aok_inherit_underscore);
+	aok_inherit_underscore = ztrdup(end + 1);
+    }
+    pipes = ztrdup(raw);
 done:
     zsfree(value);
     return pipes;
@@ -2260,6 +2637,20 @@ static void aok_restore_pipestatus(char *pipes)
  * Called from init_misc, BEFORE the -c string is parsed -- see the block
  * comment at the top of this file for why that ordering is not negotiable.
  */
+/* `$_`, applied last of all for the reason `$?` and $pipestatus are: it is set
+ * by every command, and the state is nothing but commands. Without it a
+ * subshell saw an empty `$_` where a fork sees the parent's last word --
+ * `print hello; print "[$(print -rn -- $_)]"` gave `[]` here and `[hello]` on
+ * a real fork. */
+static void aok_restore_underscore(void)
+{
+    if (!aok_inherit_underscore)
+	return;
+    setunderscore(aok_inherit_underscore);
+    zsfree(aok_inherit_underscore);
+    aok_inherit_underscore = NULL;
+}
+
 static void aok_restore_lastval(char *lastvalstr)
 {
     if (!lastvalstr)
@@ -2326,6 +2717,7 @@ void aok_child_init(void)
 	aok_read_hist_file(histfile);
 	aok_restore_lastval(lastvalstr);
 	aok_restore_pipestatus(pipes);
+	aok_restore_underscore();
 	return;
     }
     v = strtol(fdstr, &end, 10);
@@ -2335,6 +2727,7 @@ void aok_child_init(void)
 	aok_read_hist_file(histfile);
 	aok_restore_lastval(lastvalstr);
 	aok_restore_pipestatus(pipes);
+	aok_restore_underscore();
 	return;
     }
     zsfree(fdstr);
@@ -2418,4 +2811,5 @@ void aok_child_init(void)
      * assignable, but every sourced line rewrites it. */
     aok_restore_lastval(lastvalstr);
     aok_restore_pipestatus(pipes);
+    aok_restore_underscore();
 }
