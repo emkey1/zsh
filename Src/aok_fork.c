@@ -66,6 +66,7 @@
 
 #include <errno.h>
 #include <math.h>		/* isfinite, for the float emitter */
+#include <pthread.h>		/* the stack bounds, see aok_stack_bounds */
 #include <signal.h>
 #include <unistd.h>
 
@@ -104,6 +105,108 @@
  * thing misbehaves much later. The sentinel turns that into one line naming the
  * cause, and AOK_ZSH_DUMP_STATE=1 prints what the child was handed. */
 #define AOK_VAR_OK "AOK_ZSH_STATE_OK"
+
+/* ---------------------------------------------------------------- the stack
+ *
+ * THE C STACK IS A RESOURCE OF THE APP HERE, AND RUNNING OFF THE END OF IT
+ * KILLS THE APP RATHER THAN THE SHELL.
+ *
+ * A native program is a C function on a guest task's thread inside the app's
+ * one address space -- that is the premise this whole file is built on -- so
+ * zsh's recursion runs on a thread of iSH-AOK itself. Off-device, a shell that
+ * recurses past its stack takes a SIGSEGV and one process dies. Real zsh 5.9
+ * does exactly that, and is not being emulated wrongly here:
+ *
+ *     % zsh -f -c 'FUNCNEST=20000; r() { r; }; r'         killed, exit 139
+ *
+ * Here the same overrun is a SIGBUS on a thread the app cannot lose, so it
+ * takes every other shell, job and terminal down with it (host exit 138). This
+ * guard therefore exists because the BLAST RADIUS differs, not because zsh's
+ * behaviour does; it is a divergence chosen on purpose, in the direction of
+ * the shell reporting an error where real zsh would have died.
+ *
+ * WHY A DEPTH LIMIT IS NOT ENOUGH, AND WHY THE 4 MB STACK IS NOT EITHER
+ *
+ * zsh already has a depth limit, FUNCNEST, and kernel/task.c already sizes the
+ * task thread's stack so that FUNCNEST's default of 500 trips first. But
+ * FUNCNEST counts CALLS while the stack spends BYTES, and the bytes per call
+ * are not a constant. Measured on this build against the 4 MB stack:
+ *
+ *     r() { r; }               ~3.4 KB/level, died between 1200 and 1300
+ *     r() { eval r; }          ~6.3 KB/level, died between  600 and  700
+ *
+ * so a depth picked to be safe for one shape is unsafe for the next. Worse,
+ * FUNCNEST is user-settable and zsh's own message when it trips -- "increase
+ * FUNCNEST?" -- invites the user to raise it, i.e. the documented remedy for
+ * the depth guard is to walk over the cliff. `FUNCNEST=5000` is all it takes.
+ * The only quantity that answers the question is the stack that is actually
+ * left, so that is what is measured.
+ *
+ * WHERE THE BOUNDS COME FROM
+ *
+ * From pthread, not from arithmetic on a frame address: Darwin's
+ * pthread_get_stackaddr_np gives the stack's high end and
+ * pthread_get_stacksize_np its size, so the low end is exact and is not an
+ * assumption about how this thread was created -- a guest task thread, the
+ * main thread, and any future host thread that ends up running a native
+ * program all answer for themselves. Only "where am I now" comes from
+ * __builtin_frame_address(0), which is the one part that has to.
+ *
+ * A thread's stack never moves, so the bounds are worked out once per thread
+ * and what a recursing shell pays afterwards is a load and a compare.
+ *
+ * THE RESERVE
+ *
+ * What must still fit below the deepest call this refuses: the rest of the
+ * caller's own frame, zerr's formatting, and the unwind back out. 256 KB is
+ * some forty levels of the most expensive shape measured above, so it also
+ * absorbs one level that costs far more than any of them. Its price is 6% of
+ * the usable depth: plain function recursion is refused at ~1150 instead of
+ * dying at ~1250, which is still more than twice FUNCNEST's default. That
+ * margin is the point -- an ordinary script that recurses too far keeps
+ * getting zsh's own message from zsh's own guard, exactly as it does
+ * off-device, and this one is reached only by a script that has disabled that.
+ */
+#define AOK_STACK_RESERVE (256 * 1024)
+
+/* Lowest frame address that is still allowed to recurse. Worked out on first
+ * use; aok_stack_state is 0 before that, 1 when the bounds are known and -1
+ * when the platform could not answer -- in which case nothing is refused,
+ * because a guess here would break working scripts to prevent a crash that
+ * might not be coming. */
+static __thread uintptr_t aok_stack_floor;
+static __thread int aok_stack_state;
+
+static void
+aok_stack_bounds(void)
+{
+#if defined(__APPLE__)
+    pthread_t self = pthread_self();
+    void *high = pthread_get_stackaddr_np(self);
+    size_t size = pthread_get_stacksize_np(self);
+
+    if (high != NULL && size > (size_t) (2 * AOK_STACK_RESERVE)) {
+	aok_stack_floor = (uintptr_t) high - size + AOK_STACK_RESERVE;
+	aok_stack_state = 1;
+	return;
+    }
+#endif
+    aok_stack_state = -1;
+}
+
+/* True when there is not enough stack left below this point to survive another
+ * level of whatever the caller was about to do. */
+
+/**/
+int
+aok_stack_exhausted(void)
+{
+    if (aok_stack_state == 0)
+	aok_stack_bounds();
+    if (aok_stack_state != 1)
+	return 0;
+    return (uintptr_t) __builtin_frame_address(0) <= aok_stack_floor;
+}
 
 /* Set by aok_child_init, consumed by source() in init.c. */
 /**/

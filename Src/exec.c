@@ -6644,6 +6644,19 @@ doshfunc(Shfunc shfunc, LinkList doshargs, int noreturnval)
 	    lastval = 1;
 	    goto undoshfunc;
 	}
+	/* AOK: the same refusal, on the resource that actually runs out. zsh
+	 * running natively recurses on a thread of the app, so going over the
+	 * end of the C stack takes the whole app rather than this shell; and
+	 * FUNCNEST cannot prevent that, being a count of calls that the user
+	 * is invited by the message above to raise. Deliberately NOT phrased
+	 * as "increase FUNCNEST?", because here that is the thing that led the
+	 * user here. See aok_stack_exhausted in aok_fork.c. */
+	if (aok_stack_exhausted()) {
+	    zerr("maximum nested function level reached; "
+		 "out of stack (raising FUNCNEST will not help)");
+	    lastval = 1;
+	    goto undoshfunc;
+	}
 	funcsave->fstack.name = dupstring(name);
 	/*
 	 * The caller is whatever is immediately before on the stack,

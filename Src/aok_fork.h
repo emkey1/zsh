@@ -48,6 +48,12 @@ char *aok_quote_words(LinkList args);
 /* Child side, called from init_misc before the -c string is parsed. */
 void aok_child_init(void);
 
+/* True when this thread's C stack is nearly spent, so that a recursion about
+ * to go one level deeper refuses instead. Overrunning the stack of a native
+ * program kills the app rather than the shell -- see the long comment in
+ * aok_fork.c for why zsh's own FUNCNEST cannot cover this. */
+int aok_stack_exhausted(void);
+
 /* Records the zmodload autoload registrations this build is BORN with, so that
  * a fork can emit only the ones the user added. Called from zsh_main once the
  * compiled-in modules have registered and before any user code runs -- the
