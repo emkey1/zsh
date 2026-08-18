@@ -14,6 +14,12 @@
  * aok_emit_traps. */
 #define AOK_SUB_KEEPTRAP 0x01	/* entersubsh's ESUB_KEEPTRAP */
 #define AOK_SUB_ASYNC    0x02	/* entersubsh's ESUB_ASYNC */
+/* The text handed over is ONE COMMAND that the parent's execlist has already
+ * run its per-sublist machinery for -- the DEBUG trap before it, ZERR and
+ * errexit after it. Only execcmd_fork's site is like this; the command- and
+ * process-substitution sites hand over a list whose child really does run
+ * execlist. See the aok_incmd comment in execlist. */
+#define AOK_SUB_INCMD    0x04
 
 #define AOK_MAX_CLOSE 32
 
@@ -42,6 +48,13 @@ char *aok_quote_words(LinkList args);
 /* Child side, called from init_misc before the -c string is parsed. */
 void aok_child_init(void);
 
+/* Records the zmodload autoload registrations this build is BORN with, so that
+ * a fork can emit only the ones the user added. Called from zsh_main once the
+ * compiled-in modules have registered and before any user code runs -- the
+ * child takes the same snapshot at the same point, which is what makes the
+ * difference meaningful. */
+void aok_snapshot_autoloads(void);
+
 /* Set by aok_child_init so source() reads an already-open descriptor rather
  * than a path; consumed by the first source() that sees it. */
 extern __thread int aok_source_fd;
@@ -49,5 +62,9 @@ extern __thread int aok_source_fd;
 /* Traps this shell was handed by its parent, which must not make it fork for
  * the command it was launched to run -- see the comment in aok_fork.c. */
 extern __thread int aok_inherited_ntraps;
+
+/* AOK_SUB_INCMD, as the child sees it: set by aok_child_init and consumed by
+ * the first sublist execlist runs afterwards. */
+extern __thread int aok_relaunch_incmd;
 
 #endif /* AOK_FORK_H */

@@ -1965,6 +1965,11 @@ zsh_main(UNUSED(int argc), char **argv)
     init_signals();
     init_bltinmods();
     init_builtins();
+    /* AOK: the zmodload autoload registrations this binary is born with, taken
+     * here because run_init_scripts() is the first thing that can add to them.
+     * A re-launched child gets the same table for free, so a fork only has to
+     * carry the ones the user registered. See Src/aok_fork.c. */
+    aok_snapshot_autoloads();
     run_init_scripts();
     setupshin(runscript);
     init_misc(cmd, zsh_name);

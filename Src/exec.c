@@ -1408,6 +1408,7 @@ execlist(Estate state, int dont_change_job, int exiting)
     Wordcode next;
     wordcode code;
     int ret, cj, csp, ltype;
+    int odonetrap;		/* AOK: see the DEBUG trap sites below */
     int old_pline_level, old_list_pipe, old_list_pipe_job;
     char *old_list_pipe_text;
     zlong oldlineno;
@@ -1446,6 +1447,32 @@ execlist(Estate state, int dont_change_job, int exiting)
     while (wc_code(code) == WC_LIST && !breaks && !retflag && !errflag) {
 	int donedebug;
 	int this_donetrap = 0;
+	/* AOK: is THIS sublist the command a re-launch was handed?
+	 *
+	 * A forked child of execcmd_fork resumes inside execcmd: it runs the
+	 * one command and exits, and never reaches the per-sublist machinery
+	 * around it, because the parent's execlist has already done that --
+	 * fired DEBUG before the sublist, and will check ZERR and errexit
+	 * against the status it collects afterwards. A re-launched child has
+	 * to re-PARSE the command, so the same text arrives as a top-level
+	 * sublist and gets the whole treatment a second time. Two visible
+	 * symptoms, one cause: `trap "print D" DEBUG; print hi | cat` printed
+	 * D twice where zsh prints it once, and `trap "print ZERR" ZERR; false
+	 * | cat` printed ZERR from inside the pipeline -- into the PIPE, so
+	 * `false | wc -c` counted 5 bytes that do not exist, where zsh's
+	 * pipeline status is 0 and nothing fires at all.
+	 *
+	 * The flag is consumed by the first sublist that sees it, so only the
+	 * OUTERMOST one is affected: a `( ... )` body, a shell function's
+	 * body, or a $(...) whose own child runs a list still get their traps,
+	 * exactly as a fork's child does. It is set only at the execcmd_fork
+	 * site for the same reason -- the command-substitution and process-
+	 * substitution sites hand over a LIST that upstream's child really
+	 * does run through execlist, so their DEBUG firing is not spurious. */
+	int aok_incmd = aok_relaunch_incmd;
+	aok_relaunch_incmd = 0;
+	if (aok_incmd)
+	    this_donetrap = 1;
 	this_noerrexit = 0;
 
 	ltype = WC_LIST_TYPE(code);
@@ -1476,7 +1503,7 @@ execlist(Estate state, int dont_change_job, int exiting)
 		lineno = lnp1 - 1;
 	}
 
-	if (sigtrapped[SIGDEBUG] && isset(DEBUGBEFORECMD) && !intrap) {
+	if (sigtrapped[SIGDEBUG] && isset(DEBUGBEFORECMD) && !intrap && !aok_incmd) {
 	    Wordcode pc2 = state->pc;
 	    int oerrexit_opt = opts[ERREXIT];
 	    Param pm;
@@ -1488,12 +1515,37 @@ execlist(Estate state, int dont_change_job, int exiting)
 			      getpermtext(state->prog, pc2, 0),
 			      0);
 
-	    exiting = donetrap;
+	    /* AOK: `odonetrap`, not `exiting`. Upstream saves donetrap in the
+	     * `exiting` PARAMETER here and at the second DEBUG site below, and
+	     * `exiting` is what execlist passes to execpline as last1 -- "this
+	     * shell has nothing left to do, so the command may exec in place".
+	     * Clobbering it with donetrap (0 for any command that has not yet
+	     * failed) turns last1 into 0, execpline2 hands execcmd a 2, and the
+	     * fake exec becomes a fork. On real zsh that is one extra process
+	     * per command and nobody notices: `zsh -fc 'trap "" DEBUG; /bin/sh
+	     * -c "echo \$\$"' reports a pid one higher than the shell's, while
+	     * without the trap the two are equal.
+	     *
+	     * Here a fork is a RE-LAUNCH -- a fresh zsh that re-parses the same
+	     * text -- and the state gives it back the same DEBUG trap, so it
+	     * reaches the same decision and re-launches again, forever. `trap
+	     * "print D" DEBUG; ( print in )` printed D until it was killed and
+	     * never ran `print in`; the same for an external command, a
+	     * pipeline, a command substitution and a process substitution, i.e.
+	     * for every fork site there is. A DEBUG trap is not exotic: it is
+	     * what zsh's own debugger and every prompt-timing snippet install.
+	     *
+	     * So the save gets its own variable and `exiting` keeps the meaning
+	     * its name has. That also stops the second, subtler half: `exiting`
+	     * is tested at the end of execlist to decide whether the EXIT trap
+	     * runs, and after this block it held donetrap rather than the
+	     * caller's answer. */
+	    odonetrap = donetrap;
 	    ret = lastval;
 	    dotrap(SIGDEBUG);
 	    if (!retflag)
 		lastval = ret;
-	    donetrap = exiting;
+	    donetrap = odonetrap;
 	    noerrexit = oldnoerrexit;
 	    /*
 	     * Only execute the trap once per sublist, even
@@ -1504,7 +1556,7 @@ execlist(Estate state, int dont_change_job, int exiting)
 	    if (pm)
 		unsetparam_pm(pm, 0, 1);
 	} else
-	    donedebug = intrap ? 1 : 0;
+	    donedebug = (intrap || aok_incmd) ? 1 : 0;
 
 	/* Reset donetrap:  this ensures that a trap is only *
 	 * called once for each sublist that fails.          */
@@ -1628,7 +1680,8 @@ sublist_done:
 
 	noerrexit = oldnoerrexit;
 
-	if (sigtrapped[SIGDEBUG] && !isset(DEBUGBEFORECMD) && !donedebug) {
+	if (sigtrapped[SIGDEBUG] && !isset(DEBUGBEFORECMD) && !donedebug &&
+	    !aok_incmd) {
 	    /*
 	     * Save and restore ERREXIT for consistency with
 	     * DEBUGBEFORECMD, even though it's not used.
@@ -1636,12 +1689,16 @@ sublist_done:
 	    int oerrexit_opt = opts[ERREXIT];
 	    opts[ERREXIT] = 0;
 	    noerrexit |= NOERREXIT_EXIT | NOERREXIT_RETURN;
-	    exiting = donetrap;
+	    /* AOK: the NO_DEBUG_BEFORE_CMD half of the same save; see the
+	     * comment on odonetrap at the other DEBUG site above. This one
+	     * clobbers `exiting` for the NEXT sublist of the same list, and for
+	     * the EXIT-trap test at the end of the function. */
+	    odonetrap = donetrap;
 	    ret = lastval;
 	    dotrap(SIGDEBUG);
 	    if (!retflag)
 		lastval = ret;
-	    donetrap = exiting;
+	    donetrap = odonetrap;
 	    noerrexit = oldnoerrexit;
 	    opts[ERREXIT] = oerrexit_opt;
 	}
@@ -2326,6 +2383,89 @@ clobber_open(struct redir *f)
 /* size of buffer for tee and cat processes */
 #define TCBUFSIZE 4092
 
+/* AOK: would these redirections form a multio, and on which descriptor?
+ *
+ * A multio -- two or more redirections onto one descriptor, which MULTIOS
+ * makes the default -- is the one redirection zsh implements with a forked
+ * byte pump, and closemn() below explains why that fork has no re-launch
+ * equivalent. What this function is for is the DAMAGE that came with finding
+ * out too late.
+ *
+ * Upstream discovers the multio inside addfd(), by which time every target
+ * file has already been opened with O_TRUNC. So `echo hi > log > log.bak`
+ * emptied BOTH files and then failed, which is worse than either succeeding or
+ * refusing: the shell destroyed data and produced none. It was silent as well
+ * -- zfork() had already called zerr(), and zerr() returns without printing
+ * once errflag is set, so closemn's message naming the construct and the
+ * `unsetopt multios' workaround was dead code and the user saw only "fork
+ * failed: function not implemented". And because nothing set lastval, `$?` was
+ * 0 and the rest of the script was abandoned with a success status.
+ *
+ * Answering the question BEFORE the redirection loop opens anything turns all
+ * three into one ordinary failed redirection: nothing is truncated, the
+ * message says which descriptor and what to do about it, `$?` is 1, and the
+ * shell carries on. It is a scan of the same list the loop is about to walk,
+ * with zsh's own rules -- so a shape it does not recognise simply falls
+ * through to the old late failure rather than being wrongly refused here.
+ *
+ * `input` and `output` are the pipeline's descriptors, which execcmd_exec adds
+ * to fds 0 and 1 before the loop runs: `echo hi > f | cat` is a multio on fd 1
+ * exactly like `echo hi > f > g`, and f is a file that would have been
+ * truncated for nothing.
+ *
+ * Returns the descriptor, or -1 for "not a multio". */
+static int aok_multio_fd(LinkList redirs, int input, int output)
+{
+    /* Per descriptor: 0 nothing yet, 1 reading, 2 writing. Only fds 0-9 can
+     * carry a multio -- addfd sends anything else through movefd -- and a
+     * {var} redirection never can, whatever its fd. */
+    char dir[10];
+    LinkNode n;
+    int i;
+
+    if (unset(MULTIOS))
+	return -1;
+    for (i = 0; i < 10; i++)
+	dir[i] = 0;
+    if (input)
+	dir[0] = 1;
+    if (output)
+	dir[1] = 2;
+    if (!redirs)
+	return -1;
+    for (n = firstnode(redirs); n; incnode(n)) {
+	Redir fn = (Redir) getdata(n);
+	int fd = fn->fd1, want;
+
+	if (fn->varid)
+	    continue;
+	if (fn->type == REDIR_CLOSE) {
+	    /* `>&-` puts the descriptor back to having nothing on it, which is
+	     * what closemn(REDIR_CLOSE) does to mfds. */
+	    if (fd >= 0 && fd < 10)
+		dir[fd] = 0;
+	    continue;
+	}
+	if (fn->type == REDIR_HEREDOC || fn->type == REDIR_HEREDOCDASH)
+	    continue;			/* already turned into a here-string */
+	want = (fn->type == REDIR_INPIPE || fn->type == REDIR_HERESTR ||
+		fn->type == REDIR_READ || fn->type == REDIR_READWRITE ||
+		fn->type == REDIR_MERGEIN) ? 1 : 2;
+	if (fd >= 0 && fd < 10) {
+	    if (dir[fd] == want)
+		return fd;
+	    dir[fd] = (char) want;
+	}
+	/* `&>file` and `>>&file` redirect fd 2 as well, from the same node. */
+	if (IS_ERROR_REDIR(fn->type)) {
+	    if (dir[2] == 2)
+		return 2;
+	    dir[2] = 2;
+	}
+    }
+    return -1;
+}
+
 /* close an multio (success) */
 
 /**/
@@ -2364,9 +2504,21 @@ closemn(struct multio **mfds, int fd, int type)
 		zclose(mn->fds[i]);
 	    zclose(mn->pipe);
 	    if (pid == -1) {
+		/* The backstop for a shape aok_multio_fd did not recognise.
+		 * errflag has to be cleared across the zerr: zfork() has just
+		 * set it, and zerr() returns without printing when it is set,
+		 * so this message -- the only one that names the construct --
+		 * used to be dead code behind zfork's generic "fork failed".
+		 * It goes back on afterwards, because the command really has
+		 * failed. */
+		int oerrflag = errflag;
+
+		errflag = 0;
 		zerr("multios (two or more redirections on one descriptor) "
 		     "are not implemented in native zsh; "
 		     "use `unsetopt multios' or redirect once");
+		errflag = oerrflag | ERRFLAG_ERROR;
+		lastval = 1;
 		mfds[fd] = NULL;
 		child_unblock();
 		return;
@@ -2960,6 +3112,9 @@ execcmd_fork(Estate state, int how, int type, Wordcode varspc,
     sp.flags = (flags & ESUB_KEEPTRAP) ? AOK_SUB_KEEPTRAP : 0;
     if (how & Z_ASYNC)
 	sp.flags |= AOK_SUB_ASYNC;
+    /* This site, and only this site, hands over a command that the sublist
+     * machinery around it has already been run for. See execlist's aok_incmd. */
+    sp.flags |= AOK_SUB_INCMD;
     /* ZSH_SUBSHELL is counted by entersubsh, i.e. by the CHILD, so the spawn
      * normally has to supply the entry the missing fork would have made. Not
      * here when the construct is a subshell: what this site hands over is the
@@ -3134,7 +3289,7 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	 * In other cases we may need to process the command line
 	 * a bit further before we make the decision.
 	 */
-	text = getjobtext(state->prog, eparams->beg);
+	text = dupstring(getjobtext(state->prog, eparams->beg));
 	/* AOK: the job table's text and the RE-LAUNCH's text are not the same
 	 * string, and using getjobtext for both would be a silent bug.
 	 * JOBTEXTSIZE is 80 (zsh.h) and getjobtext renders into a static buffer
@@ -3635,7 +3790,16 @@ execcmd_exec(Estate state, Execcmd_params eparams,
     /* Get the text associated with this command. */
     if (!text &&
 	(!sfcontext && (jobbing || (how & Z_TIMED))))
-	text = getjobtext(state->prog, eparams->beg);
+	/* AOK: dupstring, because getjobtext renders into a static buffer and
+	 * this string has to survive a re-launch. aok_spawn_subshell writes the
+	 * state script by RUNNING it in this shell, and the script is one
+	 * anonymous function -- so it calls getjobtext for itself and leaves
+	 * "() { ... }" in the buffer this pointer aims at. addproc then copied
+	 * that, and every job an interactive native zsh listed was called
+	 * `() { ... }`: `sleep 30`, ^Z, `jobs` printed "[1] + suspended () {
+	 * ... }". The two other getjobtext sites in this function are duplicated
+	 * for the same reason. */
+	text = dupstring(getjobtext(state->prog, eparams->beg));
 
     /*
      * Set up special parameter $_
@@ -3850,7 +4014,7 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	    else
 		aoktext = getpermtext(state->prog, eparams->beg, 0);
 	    if (!text)
-		text = getjobtext(state->prog, eparams->beg);
+		text = dupstring(getjobtext(state->prog, eparams->beg));
 	    switch (execcmd_fork(state, how, type, varspc, &filelist,
 				 text, aoktext, input, output, oautocont,
 				 close_if_forked)) {
@@ -3905,6 +4069,27 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	if ((newxtrerr = fdopen(movefd(dup(fileno(stderr))), "w"))) {
 	    xtrerr = newxtrerr;
 	    fdtable[fileno(xtrerr)] = FDT_XTRACE;
+	}
+    }
+
+    /* AOK: refuse a multio here, before anything is opened. See aok_multio_fd
+     * for what the late refusal destroyed. Deliberately ahead of spawnpipes()
+     * too, so a `> >(cmd)` that is part of the doomed construct does not start
+     * a process substitution nobody will ever read. */
+    {
+	int aokfd = aok_multio_fd(redir, input, output);
+
+	if (aokfd >= 0) {
+	    /* zwarn, not zerr, for the same reason every other failed
+	     * redirection in this loop uses it: zerr sets errflag, and errflag
+	     * abandons the rest of the list. One bad redirection is one failed
+	     * command with `$? == 1`, not the end of the script -- which is
+	     * what `echo hi > a > b; print CONTINUED` proves, since zsh prints
+	     * CONTINUED and so, now, does this. */
+	    zwarn("multios (two or more redirections on one descriptor) are not "
+		  "implemented in native zsh: fd %d. Use `unsetopt multios', or "
+		  "redirect once and copy afterwards.", aokfd);
+	    execerr();
 	}
     }
 

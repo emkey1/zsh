@@ -85,11 +85,14 @@
  *   AOK_ZSH_LASTVAL   `$?`, which cannot be set by a shell command; see below
  *   AOK_ZSH_INHERIT   the rest of the readonly state a fork would have copied:
  *                     `$!`, `$PPID`, `$ZSH_SUBSHELL` and `$pipestatus`
+ *   AOK_ZSH_HISTFILE  a temp file holding the parent's in-memory history, read
+ *                     and then unlinked by the child -- see aok_write_hist_file
  */
-#define AOK_VAR_FD      "AOK_ZSH_STATE_FD"
-#define AOK_VAR_DOLLAR  "AOK_ZSH_DOLLAR"
-#define AOK_VAR_LASTVAL "AOK_ZSH_LASTVAL"
-#define AOK_VAR_INHERIT "AOK_ZSH_INHERIT"
+#define AOK_VAR_FD       "AOK_ZSH_STATE_FD"
+#define AOK_VAR_DOLLAR   "AOK_ZSH_DOLLAR"
+#define AOK_VAR_LASTVAL  "AOK_ZSH_LASTVAL"
+#define AOK_VAR_INHERIT  "AOK_ZSH_INHERIT"
+#define AOK_VAR_HISTFILE "AOK_ZSH_HISTFILE"
 
 /* The last line the state emits. The child checks for it and complains on the
  * REAL stderr if it is missing.
@@ -121,6 +124,13 @@ __thread int aok_source_fd = -1;
  * `( trap "print bye" EXIT; /bin/true )` still forks and still prints bye. */
 /**/
 __thread int aok_inherited_ntraps = 0;
+
+/* Whether the command this shell was launched to run is one the SPAWNER's
+ * execlist has already fired the DEBUG trap for and will check ZERR and
+ * errexit against. Set from the state's AOK_ZSH_INHERIT, consumed by the first
+ * sublist execlist runs -- see the aok_incmd comment in exec.c. */
+/**/
+__thread int aok_relaunch_incmd = 0;
 
 /* ------------------------------------------------------------ the state script
  *
@@ -155,11 +165,36 @@ __thread int aok_inherited_ntraps = 0;
  *     `zmodload zsh/mapfile`, and only a fixed handful of modules autoload on
  *     demand; strftime, sysopen and pcre_compile do not.
  *
- * (4) Options before anything that uses a pattern. zsh compiles a pattern at
- *     first USE and caches it forever, so a function containing `@(foo|bar)`
- *     replayed without `kshglob` sources cleanly, returns 0, and matches
- *     nothing. Silently wrong rather than a syntax error, which is the harder
- *     failure to notice.
+ * (4) Options LAST, after every line the child has to parse. This rule used to
+ *     say the opposite -- options before anything that uses a pattern, because
+ *     a function containing `@(foo|bar)` replayed without `kshglob` sources
+ *     cleanly, returns 0 and matches nothing. That reasoning was wrong about
+ *     WHEN a pattern is compiled, and the mistake was expensive.
+ *
+ *     zsh compiles a pattern at first USE and caches it in the parse tree, not
+ *     at parse time. `f() { case foo in (@(foo|bar)) ... }; setopt kshglob; f`
+ *     matches -- in zsh 5.9 and in this shell alike -- so a function body that
+ *     arrives before its options still gets its patterns compiled after them,
+ *     because the child runs nothing until the whole state is in.
+ *
+ *     Meanwhile an option set before the text is an option applied to the
+ *     LEXER, and the text is not written for it. A parent in `emulate sh` has
+ *     SH_GLOB, where `(` is not a pattern character, so a body containing
+ *     `[[ ab == (a)b ]]` or a `*(.)` glob qualifier was a parse error: source
+ *     abandoned the rest of the file and every function, alias, zstyle, hash
+ *     and readonly parameter after it went silently missing, along with the
+ *     epilogue that sets errexit and nounset. RC_QUOTES is the same story one
+ *     layer down -- with it on, the `'\''` that zsh's own printers write for an
+ *     embedded quote stops meaning what they wrote it to mean.
+ *
+ *     So the ordering is not a compromise between two risks. Every line of the
+ *     state is PRODUCED by zsh's printers under `emulate -L zsh`, and zsh's own
+ *     defaults -- exactly what a `zsh -f` child has until the options block
+ *     runs -- are the reading of it that round-trips. See aok_emit_options.
+ *
+ *     `setopt no_aliases` is the one exception and it is rule (1)'s, not this
+ *     one's: it does not change what a word MEANS, it stops a word being
+ *     replaced by another one.
  *
  * (5) Readonly parameters LAST, after every other assignment. A read-only
  *     variable assigned twice is a runtime error, and a runtime error aborts
@@ -269,8 +304,20 @@ __thread int aok_inherited_ntraps = 0;
  *       - the module tables, which are `hide hideval` associations owned by
  *         zsh/parameter and friends.
  *
- *     `0` is excluded because it reaches the child as argv[5] of the spawn,
+ *     `0` is left out because it reaches the child as argv[5] of the spawn,
  *     and `typeset -g 0=...` is not even valid syntax.
+ *
+ *     Where several names are one storage, only one of them is listed --
+ *     PS1..PS4 rather than the PROMPT, PROMPT2..4 and prompt spellings of the
+ *     same four C variables, RPS1/RPS2 rather than RPROMPT/RPROMPT2, histchars
+ *     rather than HISTCHARS, and the array half of each tie (path, cdpath,
+ *     fpath, manpath, mailpath, psvar, fignore, module_path) rather than both
+ *     halves. The name kept is the one that exists in every emulation; the
+ *     others would each have added a line to every subshell to assign a value
+ *     that had just been assigned. TRY_BLOCK_ERROR and
+ *     TRY_BLOCK_INTERRUPT are dropped for a different reason: they describe a
+ *     `try` block in progress, and continuing one is precisely what a
+ *     re-launched child cannot do.
  *
  * (11) `${(@q-)dirstack}`, with the (@) that the argv line beside it gets from
  *     its `@`. Without it the nested expansion sits in a double-quoted context,
@@ -279,6 +326,32 @@ __thread int aok_inherited_ntraps = 0;
  *     child saw $#dirstack == 1. popd in a subshell then failed with "no such
  *     file or directory: /etc /usr", `cd +2` did not move, and a directory
  *     whose name contains a space was destroyed outright.
+ *
+ * (12) SERIALISING A SHELL MUST NOT CHANGE IT. This script runs in the PARENT,
+ *     which is the whole reason the rules above exist, and it is just as true
+ *     of side effects as of quoting. Two lines in here were mutating the shell
+ *     they were describing: `zmodload -i zsh/parameter`, which the script needs
+ *     to read $functions and $parameters at all, and `zstyle -L`, whose very
+ *     name autoloads zsh/zutil -- and zutil pulls in zsh/complete, which pulls
+ *     in zsh/zle. So `zmodload -e zsh/zle` answered NO in a fresh shell and YES
+ *     after the first command substitution it ever ran, `zmodload -u` could not
+ *     keep a module unloaded across any subshell, and every child was told to
+ *     load four modules its parent had never asked for. A real fork does all of
+ *     that work on the far side of fork() where nobody can see it.
+ *
+ *     The module list is therefore read BEFORE zsh/parameter is loaded, the
+ *     load is undone at the end if this shell did not already have it, and
+ *     zstyle is only called when zsh/zutil is loaded already -- which is exact
+ *     rather than conservative, because using zstyle is the only way to have a
+ *     zstyle and also the thing that loads the module.
+ *
+ * WHAT IS NOT IN THIS SCRIPT. Four tables have no shell-level printer whose
+ * output can be replayed, or are hidden from the script by the parent's own
+ * shell context, and they are emitted from C further down: the autoload flags
+ * (zsh/parameter renders U and t and cannot render k or z), the command hash
+ * table, per-function sticky emulation, and TRAPEXIT -- which starttrapscope()
+ * removes from shfunctab for the whole life of the anonymous function above.
+ * The history goes its own way again, as a file; see aok_write_hist_file.
  */
 static const char aok_state_script[] =
 "() {\n"
@@ -286,6 +359,17 @@ static const char aok_state_script[] =
 "  setopt no_aliases no_nomatch no_unset\n"
 "  local __aok_k __aok_v __aok_a __aok_b\n"
 "  local -a __aok_ro __aok_fn __aok_pv __aok_hv __aok_out\n"
+"  local -a __aok_sp __aok_pk __aok_dflt\n"
+"  local -i __aok_keeppar=0\n"
+/* Rule (12): the module list is read BEFORE zsh/parameter is loaded, and
+ * zsh/parameter is unloaded again if this shell did not already have it.
+ * Serialising a shell must not change it, and this line is where it changed:
+ * `zmodload -L` emitted below the load would have told every child to load
+ * zsh/parameter too -- a module the parent never asked for, four more lines in
+ * every subshell (zsh/zutil pulls in zsh/complete and zsh/zle), and a
+ * permanent lie in the parent's own `zmodload -L`. */
+"  zmodload -L\n"
+"  zmodload -e zsh/parameter && __aok_keeppar=1\n"
 "  zmodload -i zsh/parameter 2>/dev/null\n"
 
 /* $functions[k] is not a lookup, it is getpermtext() rendering the whole
@@ -294,6 +378,20 @@ static const char aok_state_script[] =
  * ~3000 function bodies to serialise 971. It is read once. */
 "  for __aok_k in \"${(@k)functions}\"; do\n"
 "    __aok_b=$functions[$__aok_k]\n"
+/* An autoload stub is skipped here and emitted from C by aok_emit_autoloads.
+ * It used to be rebuilt from this text, and the flags never survived: the
+ * extraction was `${(M)__aok_v##[A-Za-z]#}`, whose `#` closure operator needs
+ * EXTENDED_GLOB, which the `emulate -L zsh` two lines above this loop turns
+ * OFF -- so the pattern was read as "a letter followed by a literal #", matched
+ * nothing, and every autoload crossed as a bare `autoload -- name`. Losing -U
+ * is not cosmetic: -U is exactly what stops alias expansion while the function
+ * file is parsed, and compinit registers its 971 functions with `autoload -Uz`.
+ *
+ * Adding `setopt extended_glob` here would have fixed the extraction and still
+ * lost half the answer, because this text is all zsh/parameter can tell us:
+ * getfunction() renders a stub as "builtin autoload -X" plus U and t and
+ * nothing else, so -k and -z are not in it to be extracted. The shfunc's own
+ * flag bits have all four, so the emission moved to C. */
 /* Anchored, not a substring search. zsh/parameter renders an autoload stub as
  * exactly "builtin autoload -X" plus its flag letters and nothing before it,
  * while a real body always begins with the tab the printer indents it with (or
@@ -303,9 +401,7 @@ static const char aok_state_script[] =
  * every call in every subshell answered "function definition file not found".
  * It is not a contrived body either: this file's own test harness tripped it. */
 "    if [[ $__aok_b == 'builtin autoload -X'* ]]; then\n"
-"      __aok_v=${__aok_b#*autoload -X}\n"
-"      __aok_v=${(M)__aok_v##[A-Za-z]#}\n"
-"      __aok_out+=( \"autoload ${__aok_v:+-$__aok_v} -- ${(q)__aok_k}\" )\n"
+"      continue\n"
 "    elif [[ $__aok_b == '{'* ]]; then\n"
 "      __aok_fn+=( \"function ${(qq)__aok_k} $__aok_b\" )\n"
 "    else\n"
@@ -314,54 +410,62 @@ static const char aok_state_script[] =
 "  done\n"
 "  for __aok_k in \"${(@k)parameters}\"; do\n"
 "    __aok_a=$parameters[$__aok_k]\n"
-"    case $__aok_k in (__aok_*|AOK_ZSH_*|argv|status|0) continue ;; esac\n"
-"    if [[ $__aok_a == *special* ]]; then\n"
-"      case $__aok_k in\n"
-"      (IFS|WORDCHARS|KEYBOARD_HACK|HISTCHARS|histchars|SHLVL) ;;\n"
-"      (HISTSIZE|SAVEHIST|FUNCNEST|LINES|COLUMNS|ZLE_RPROMPT_INDENT) ;;\n"
-"      (OPTIND|OPTARG|NULLCMD|READNULLCMD|POSTEDIT|WATCH|watch) ;;\n"
-"      (PS1|PS2|PS3|PS4|RPS1|RPS2|RPROMPT|RPROMPT2|SPROMPT) ;;\n"
-"      (prompt|PROMPT|PROMPT2|PROMPT3|PROMPT4) ;;\n"
-"      (TRY_BLOCK_ERROR|TRY_BLOCK_INTERRUPT) ;;\n"
-"      (PATH|path|CDPATH|cdpath|FPATH|fpath|MANPATH|manpath) ;;\n"
-"      (MAILPATH|mailpath|FIGNORE|fignore|PSVAR|psvar) ;;\n"
-"      (MODULE_PATH|module_path) ;;\n"
-"      (*) continue ;;\n"
-"      esac\n"
-"    fi\n"
+"    [[ $__aok_a == *special* ]] && continue\n"
+"    case $__aok_k in (__aok_*|AOK_ZSH_*|argv|status) continue ;; esac\n"
 "    [[ $__aok_a == *hideval* ]] && __aok_hv+=( $__aok_k )\n"
 "    [[ $__aok_a == *float* ]] && continue\n"
 "    if [[ $__aok_a == *readonly* ]]; then __aok_ro+=( $__aok_k )\n"
 "    else __aok_pv+=( $__aok_k )\n"
 "    fi\n"
 "  done\n"
-/* A special the parent UNSET does not appear in $parameters at all -- the loop
- * above cannot see it, and the child, which starts as a fresh `zsh -f`, has it
- * back at its default. `unset IFS` is the one that gets written on purpose
- * (POSIX-minded scripts do it), and while zsh splits identically with IFS unset
- * and IFS at its default, `${+IFS}` and `${IFS-x}` do not. So the names a fresh
- * shell has SET are asked about by name; in a shell that unset none of them
- * this emits nothing at all, which is why it is a loop in the parent rather
- * than a line in the child. The list is rule (10)'s, minus the members a fresh
- * `zsh -f` already has unset -- there is nothing to correct for those. */
-"  for __aok_k in IFS WORDCHARS KEYBOARD_HACK HISTCHARS histchars SHLVL \\\n"
-"      HISTSIZE SAVEHIST FUNCNEST LINES COLUMNS OPTIND OPTARG NULLCMD \\\n"
-"      READNULLCMD PS1 PS2 PS3 PS4 SPROMPT prompt PROMPT PROMPT2 PROMPT3 \\\n"
-"      PROMPT4 TRY_BLOCK_ERROR TRY_BLOCK_INTERRUPT PATH path CDPATH cdpath \\\n"
-"      FPATH fpath MANPATH manpath MAILPATH mailpath FIGNORE fignore PSVAR \\\n"
-"      psvar MODULE_PATH module_path; do\n"
-"    [[ -v $__aok_k ]] || __aok_out+=( \"unset -- $__aok_k\" )\n"
-"  done\n"
+/* Rule (10)'s list, and it is worth saying why it is three array expansions
+ * rather than a test inside the loop above. Deciding this per parameter, with a
+ * `case` of alternations, cost 2.5ms of a 7ms subshell all by itself: the loop
+ * runs once per parameter -- 110 of them with zsh/parameter loaded, a thousand
+ * after compinit -- and every extra command in its body is paid that many
+ * times. Set arithmetic on the names is paid once. `${A:*B}` keeps the names
+ * that exist (so nothing has to test, and an emulation without `path` simply
+ * contributes nothing rather than an error), and `${A:|B}` is the mirror image
+ * used for the unset case below.
+ *
+ * None of these is readonly, hidden or a float, so they go straight into the
+ * plain list rather than through the classification above.
+ *
+ * Only the array half of each tied pair is named. The two halves are one
+ * storage and `typeset -aT CDPATH cdpath=( ... )` sets both, so naming CDPATH
+ * as well would have added a line per pair to every subshell to assign what had
+ * just been assigned. */
+"  __aok_sp=( IFS WORDCHARS KEYBOARD_HACK histchars SHLVL POSTEDIT HISTSIZE \\\n"
+"      SAVEHIST FUNCNEST LINES COLUMNS ZLE_RPROMPT_INDENT OPTIND OPTARG \\\n"
+"      NULLCMD READNULLCMD WATCH watch PS1 PS2 PS3 PS4 RPS1 RPS2 SPROMPT \\\n"
+"      path cdpath fpath manpath mailpath psvar fignore module_path )\n"
+"  __aok_pk=( \"${(@k)parameters}\" )\n"
+"  __aok_pv+=( ${__aok_sp:*__aok_pk} )\n"
+/* A special the parent UNSET is not in $parameters at all -- there is nothing
+ * to serialise, and the child, being a fresh `zsh -f`, has it back at its
+ * default. `unset IFS` is the one that gets written on purpose (POSIX-minded
+ * scripts do it): zsh splits identically with IFS unset and IFS at its default,
+ * but `${+IFS}` and `${IFS-x}` do not agree, and a fork's child does. The
+ * subtraction is against the names a fresh child has SET: for the handful it
+ * starts without, an `unset` line would be a no-op paid on every fork. */
+"  __aok_dflt=( POSTEDIT ZLE_RPROMPT_INDENT WATCH watch RPS1 RPS2 )\n"
+"  __aok_out+=( ${${${__aok_sp:|__aok_pk}:|__aok_dflt}/#/unset -- } )\n"
 "  __aok_out+=( \"dirstack=( ${(j: :)${(@q-)dirstack}} )\" )\n"
 "  __aok_out+=( \"argv=( ${(j: :)${(q-)@}} )\" )\n"
 "  print -rl -- \"${(@)__aok_out}\"\n"
-"  zmodload -L\n"
 "  (( $#__aok_hv )) && typeset -g +H -- \"${(@)__aok_hv}\" 2>/dev/null\n"
 "  (( $#__aok_pv )) && typeset -p -- \"${(@)__aok_pv}\"\n"
 "  (( $#__aok_fn )) && print -rl -- \"${(@)__aok_fn}\"\n"
 "  functions -M\n"
 "  alias -L; alias -gL; alias -sL\n"
-"  zstyle -L 2>/dev/null\n"
+/* Rule (12) again. `zstyle` is an AUTOLOADED builtin of zsh/zutil, so calling
+ * it to find out whether there are any zstyles LOADS zsh/zutil -- and
+ * zutil.mdd declares moddeps="zsh/complete", whose complete.mdd declares
+ * moddeps="zsh/zle", so one `zstyle -L` in the serialiser permanently added
+ * three modules to the shell being serialised. The guard is exact rather than
+ * conservative: the only way to have a zstyle is to have run `zstyle`, which
+ * is the same thing that loads the module. */
+"  zmodload -e zsh/zutil && zstyle -L\n"
 "  hash -dL\n"
 "  for __aok_k in \"${(@)__aok_ro}\"; do\n"
 "    print -rn -- \"(( \\${+parameters[$__aok_k]} )) || \"\n"
@@ -369,12 +473,16 @@ static const char aok_state_script[] =
 "  done\n"
 "  (( $#__aok_hv )) && print -r -- \"typeset -g -H -- ${(@q)__aok_hv}\"\n"
 "  (( $#__aok_hv )) && typeset -g -H -- \"${(@)__aok_hv}\" 2>/dev/null\n"
+/* Last, because everything above reads through it. */
+"  (( __aok_keeppar )) || zmodload -u zsh/parameter 2>/dev/null\n"
 "  return 0\n"
 "} \"$@\"\n";
 
-/* The shell options, emitted from C rather than from the script above.
+/* The shell options and the emulation mode, emitted from C rather than from the
+ * script above, and emitted LAST -- after every line of state the child has to
+ * parse. Both halves of that sentence were bugs.
  *
- * Three reasons, and only the third is about speed.
+ * WHY FROM C. Three reasons, and only the third is about speed.
  *
  * CORRECTNESS: the script runs inside `emulate -L zsh`, which changes the
  * emulation-sensitive options for the duration -- so `${(kv)options}` read in
@@ -389,12 +497,41 @@ static const char aok_state_script[] =
  * COST: emitting all of them was about 180 separate commands for the child to
  * parse and run, on every subshell, to say almost nothing.
  *
+ * WHY LAST. See rule (4): the state is TEXT, and every option that changes what
+ * the lexer does changes what that text means. This block used to be first, and
+ * a parent sitting in `emulate sh` therefore had its own function bodies
+ * re-lexed under SH_GLOB -- where `(` is not a pattern character, so a body
+ * containing `[[ ab == (a)b ]]` or a `*(.)` glob qualifier was a PARSE ERROR.
+ * source() gave up at that line and every function, alias, zstyle, hash and
+ * readonly parameter after it was silently dropped, along with the epilogue
+ * that sets errexit and nounset. RC_QUOTES is the same story one layer down:
+ * with it on, the `'\''` that zsh's own printers write for an embedded quote no
+ * longer means what they wrote it to mean.
+ *
+ * Emitting them last is not merely safer, it is what the text asks for: every
+ * line of the state was PRODUCED by zsh's printers under `emulate -L zsh`, so
+ * zsh's own defaults -- which is exactly what a `zsh -f` child has until this
+ * block runs -- are the reading of it that round-trips.
+ *
+ * The one thing rule (4) was worried about survives the move, and it is worth
+ * saying why. A pattern is compiled at first USE and cached in the parse tree,
+ * not compiled at parse time: `f() { case foo in (@(foo|bar)) ... }; setopt
+ * kshglob; f` matches, in this shell and in zsh 5.9 alike. So a function body
+ * that arrives before its options still gets its patterns compiled after them,
+ * because the child does not run anything until the whole state is in.
+ *
  * Excluded: the options that describe what KIND of shell this is rather than
  * how it behaves. A re-launched child is a non-interactive `zsh -f -c`, and
  * telling it that it is interactive, a login shell, running ZLE or reading its
- * commands from standard input would be false. RCS and GLOBALRCS have already
- * done whatever they were going to do by the time the state is read. ERREXIT,
- * UNSET, VERBOSE, XTRACE, PRINTEXITVALUE and ALIASESOPT are emitted by
+ * commands from standard input would be false. PRIVILEGED is excluded for a
+ * harder reason: turning it OFF is not a bookkeeping change, dosetopt performs
+ * a real setuid/setgid, and a refusal there is an error that would abort the
+ * rest of the sourced state. RCS and GLOBALRCS are NOT excluded any more --
+ * they have indeed already done whatever they were going to do, but the child
+ * is spawned with `-f`, which forces NO_RCS, so leaving them out did not leave
+ * them alone: it handed every child rcs=off whatever the parent had, and
+ * `[[ -o rcs ]]` is a question a script is allowed to ask. ERREXIT, UNSET,
+ * VERBOSE, XTRACE, PRINTEXITVALUE and ALIASESOPT are emitted by
  * aok_emit_epilogue instead, after the assignments they would otherwise fire
  * on. */
 static int aok_option_excluded(int optno)
@@ -402,7 +539,6 @@ static int aok_option_excluded(int optno)
     switch (optno) {
     case INTERACTIVE: case LOGINSHELL: case MONITOR: case USEZLE:
     case SHINSTDIN: case SINGLECOMMAND: case PRIVILEGED:
-    case RCS: case GLOBALRCS:
     case ERREXIT: case UNSET: case VERBOSE: case XTRACE:
     case PRINTEXITVALUE: case ALIASESOPT:
 	return 1;
@@ -411,7 +547,69 @@ static int aok_option_excluded(int optno)
     }
 }
 
-static FILE *aok_opt_out;
+/* Does the state tell the child to `emulate` something? Only if the parent is
+ * not where a fresh shell already is. parseargs runs `emulate(zsh_name, 1,
+ * ...)`, so a `zsh -f -c` child boots at EMULATE_ZSH|EMULATE_FULLY exactly. */
+static int aok_emulation_emitted(void)
+{
+    return emulation != (EMULATE_ZSH|EMULATE_FULLY);
+}
+
+/* What opts[optno] holds in the child at the moment the option lines below run.
+ *
+ * This used to be assumed to be `defset(on, EMULATE_ZSH)`, i.e. the option
+ * table's own zsh-default bit, and for two options that assumption is false --
+ * which makes the parent's value UNREPRESENTABLE in one direction, because the
+ * emitter says nothing when the parent agrees with the assumed default and the
+ * child then disagrees with both. HASH_DIRS is the one that bit: the table
+ * marks it OPT_ALL, but init.c sets `opts[HASHDIRS] = opts[INTERACTIVE]` at
+ * startup, so a non-interactive child really starts with it off -- and a parent
+ * that had turned it ON emitted nothing at all.
+ *
+ * Modelling the child rather than the table closes that class instead of that
+ * option. The child is a non-interactive `zsh -f -c`, so:
+ *
+ *   - every option that is not OPT_SPECIAL starts at its zsh default (that is
+ *     what parseopts_setemulate's `emulate(zsh_name, 1, ...)` does), and the
+ *     OPT_SPECIAL ones are set by hand right after -- all seven of those are in
+ *     aok_option_excluded, so they never reach here;
+ *   - HASHDIRS and MONITOR are then overwritten with INTERACTIVE, which is 0;
+ *   - `-f` on the spawn line forces RCS off;
+ *   - and if the state emits an `emulate` line, that has moved the options it
+ *     owns to the parent emulation's defaults before this block is read. */
+static int aok_child_opt_default(Optname on)
+{
+    int v = !!(on->node.flags & EMULATE_ZSH);
+
+    switch (on->optno) {
+    case HASHDIRS:
+	v = 0;			/* init.c: = opts[INTERACTIVE] */
+	break;
+    case RCS:
+	v = 0;			/* the `-f` on the spawn line */
+	break;
+    default:
+	break;
+    }
+
+    if (aok_emulation_emitted()) {
+	/* setemulate(): with `emulate -R` every option that is not OPT_SPECIAL
+	 * is reset, and without it only the ones flagged as relevant to
+	 * emulation. OPT_SPECIAL and OPT_EMULATE live in options.c, but they
+	 * are just bits above the emulation ones. */
+	int fully = (emulation & EMULATE_FULLY);
+	int special = (on->node.flags & (EMULATE_UNUSED << 1));
+	int emulated = (on->node.flags & EMULATE_UNUSED);
+
+	if (fully ? !special : !!emulated)
+	    v = !!(on->node.flags & SHELL_EMULATION());
+    }
+    return v;
+}
+
+/* __thread for the reason aok_disabled gives: two native zsh shells share this
+ * address space and can be serialising at the same moment. */
+static __thread FILE *aok_opt_out;
 
 static void aok_emit_one_option(HashNode hn, UNUSED(int flags))
 {
@@ -422,15 +620,47 @@ static void aok_emit_one_option(HashNode hn, UNUSED(int flags))
      * alias has a negative optno and would emit each one a second time. */
     if (optno <= 0)
 	return;
+    /* And it holds bash's and ksh's spellings -- `hashall` for HASH_CMDS,
+     * `histappend` for APPEND_HISTORY, `trackall`, `histexpand`, `physical` --
+     * as OPT_ALIAS nodes carrying no emulation bits at all. Those compared
+     * unequal to every option that is on by default, so a plain `zsh -f`
+     * subshell was handed five option lines it did not need, and any option
+     * with an alias was said twice. printoptionnode skips them the same way. */
+    if (on->node.flags & (EMULATE_UNUSED << 2))
+	return;
     if (aok_option_excluded(optno))
 	return;
-    /* defset() is a macro private to options.c: an option is on by default in
-     * an emulation when its flags carry that emulation's bit. The child's
-     * emulation is EMULATE_ZSH, because it is started as `zsh -f`. */
-    if (!!opts[optno] == !!(on->node.flags & EMULATE_ZSH))
+    if (!!opts[optno] == aok_child_opt_default(on))
 	return;
-    fprintf(aok_opt_out, "%s %s\n", opts[optno] ? "setopt" : "unsetopt",
+    fprintf(aok_opt_out, "builtin %s %s\n", opts[optno] ? "setopt" : "unsetopt",
 	    on->node.nam);
+}
+
+/* `setopt no_aliases`, on its own, as the FIRST line of the state -- see rule
+ * (1). It cannot wait for the options block below, because by then the child
+ * has parsed every function body and alias definition in the state.
+ *
+ * `builtin` in front of it, and in front of every other command this file
+ * writes into the state, for the CHILD-side half of the problem the getnode
+ * swap in aok_run_state_script solves for the parent. A shell function shadows
+ * a builtin of the same name, the state defines the parent's functions, and
+ * everything emitted after them therefore ran the user's code instead of the
+ * shell's: with `setopt() { print SHADOWED $* }` in the parent, the epilogue's
+ * `setopt aliases` printed into the middle of the subshell's output, so
+ * `$(print hi)` returned "SHADOWED aliases\nhi" -- and the option was never
+ * restored. Moving the options after the function text (rule 4) would have
+ * widened that from the epilogue to every option. `builtin` costs one word per
+ * line and cannot itself be shadowed by an alias, since aliases are off here;
+ * a shell function actually named `builtin` would still get through, which is
+ * one name rather than a dozen. */
+static void aok_emit_prologue(int fd)
+{
+    FILE *out = fdopen(dup(fd), "w");
+
+    if (!out)
+	return;
+    fputs("builtin setopt no_aliases\n", out);
+    fclose(out);
 }
 
 static void aok_emit_options(int fd)
@@ -439,9 +669,31 @@ static void aok_emit_options(int fd)
 
     if (!out)
 	return;
+    /* The emulation itself, which is not an option and was not carried at all:
+     * a child of `emulate ksh` answered `zsh` to a bare `emulate`, and listed
+     * its options against zsh's defaults rather than ksh's, so `emulate sh;
+     * setopt` printed 40 words where the fork it stands for prints 8. The
+     * option VALUES were right even then -- they are emitted below -- so what
+     * was missing is the `emulation` variable that everything else keys off.
+     *
+     * It goes before the option lines because it MOVES them: `emulate ksh`
+     * resets every option it owns, which is why aok_child_opt_default has to
+     * model it. And it is followed by `setopt no_aliases` again, because
+     * ALIASESOPT is one of the options it resets and the lines after this one
+     * are still shell text that the child has to parse. */
+    if (aok_emulation_emitted()) {
+	const char *mode;
+
+	switch (SHELL_EMULATION()) {
+	case EMULATE_CSH: mode = "csh"; break;
+	case EMULATE_KSH: mode = "ksh"; break;
+	case EMULATE_SH:  mode = "sh";  break;
+	default:	  mode = "zsh"; break;
+	}
+	fprintf(out, "builtin emulate %s%s\nbuiltin setopt no_aliases\n",
+		(emulation & EMULATE_FULLY) ? "-R " : "", mode);
+    }
     aok_opt_out = out;
-    /* no_aliases FIRST, before anything the child parses -- see rule (1). */
-    fputs("setopt no_aliases\n", out);
     scanhashtable(optiontab, 1, 0, 0, aok_emit_one_option, 0);
     aok_opt_out = NULL;
     fclose(out);
@@ -560,6 +812,7 @@ static int aok_run_state_script(int fd)
 {
     int saved_out, ret = 0;
     int olastval, oerrflag, otrap_state, onoerrexit, oexit_pending;
+    int odebug, ozerr;
     int onoaliases, i;
 
     fflush(stdout);
@@ -572,21 +825,39 @@ static int aok_run_state_script(int fd)
 
     /* The serialiser must not be observable in the shell that runs it.
      *
-     * trap_state goes INACTIVE so a DEBUG or ZERR trap does not fire once per
-     * line of the state -- bash's equivalent bug was an EXIT trap firing once
-     * per subshell, and this is the same class one step earlier. noerrexit and
-     * errflag keep a parent under `setopt errexit` from dying inside its own
-     * bookkeeping, and lastval is restored because `$?` is part of the state
-     * being captured and every command here would clobber it. */
+     * noerrexit and errflag keep a parent under `setopt errexit` from dying
+     * inside its own bookkeeping, and lastval is restored because `$?` is part
+     * of the state being captured and every command here would clobber it.
+     * trap_state goes INACTIVE so that a `return` inside a trap does not mean
+     * "return from the trap" while this runs, which is what source() does for
+     * the same reason.
+     *
+     * The DEBUG and ZERR traps need more than that, and the comment that used
+     * to be here credited trap_state with work it does not do: dotrap()
+     * consults sigtrapped and errflag, never trap_state, so a DEBUG trap fired
+     * once per SUBLIST of this script -- roughly ten times, with fd 1 pointing
+     * at the state pipe, so ten "D" lines were written INTO THE STATE the
+     * child then sourced. ZERR is the same story for any line of the script
+     * whose status is non-zero.
+     *
+     * The ZSIG_IGNORED bit is dotrapargs' own way of saying "not now": it sets
+     * exactly this bit on the trap it is running so the trap cannot re-enter
+     * itself. Setting it here says the same thing about the whole serialiser,
+     * and it is restored rather than cleared so that a trap the user really
+     * has ignored stays ignored. */
     olastval = (int) lastval;
     oerrflag = errflag;
     otrap_state = trap_state;
     onoerrexit = noerrexit;
     oexit_pending = exit_pending;
+    odebug = sigtrapped[SIGDEBUG];
+    ozerr = sigtrapped[SIGZERR];
 
     trap_state = TRAP_STATE_INACTIVE;
     noerrexit = NOERREXIT_EXIT | NOERREXIT_RETURN;
     errflag = 0;
+    sigtrapped[SIGDEBUG] |= ZSIG_IGNORED;
+    sigtrapped[SIGZERR] |= ZSIG_IGNORED;
 
     /* The parent-proofing described above. */
     onoaliases = noaliases;
@@ -614,6 +885,8 @@ static int aok_run_state_script(int fd)
     trap_state = otrap_state;
     noerrexit = onoerrexit;
     exit_pending = oexit_pending;
+    sigtrapped[SIGDEBUG] = odebug;
+    sigtrapped[SIGZERR] = ozerr;
 
     if (dup2(saved_out, 1) < 0)
 	ret = -1;
@@ -666,18 +939,466 @@ static void aok_emit_traps(int fd, int flags)
 	if (!name)
 	    continue;
 	if (!siglists[sig]) {
-	    fprintf(out, "trap -- '' %s\n", name);
+	    fprintf(out, "builtin trap -- '' %s\n", name);
 	    continue;
 	}
 	s = getpermtext(siglists[sig], NULL, 0);
 	if (!s)
 	    continue;
-	fputs("trap -- ", out);
+	fputs("builtin trap -- ", out);
 	quotedzputs(s, out);
 	fprintf(out, " %s\n", name);
 	zsfree(s);
     }
     unqueue_signals();
+    fclose(out);
+}
+
+/* ------------------------------------------- the tables the script cannot see
+ *
+ * Everything below is emitted from C for one of two reasons: either the table
+ * has no shell-level printer whose output can be replayed (the command hash,
+ * the autoload flags, sticky emulation), or the parent's own shell context
+ * hides it from the script (TRAPEXIT). */
+
+static __thread FILE *aok_tab_out;
+
+/* Autoloaded functions -- `autoload -Uz f` -- with their FLAGS.
+ *
+ * The script used to rebuild these from the text zsh/parameter renders for a
+ * stub, and got the flags wrong twice over: the extraction needed EXTENDED_GLOB
+ * and never ran (see the comment in the loop), and even repaired it could only
+ * ever have recovered U and t, because that text has no room for anything else.
+ * The four bits are right here on the node.
+ *
+ * Not carried: the resolved `filename` that `autoload -r`/`-R` stores, because
+ * `autoload` has no option that means "and its definition is at this path".
+ * A child re-resolves it against the fpath the state gave it, which is the same
+ * answer in every case except one where the parent's fpath has since changed. */
+static void aok_emit_one_autoload(HashNode hn, UNUSED(int flags))
+{
+    Shfunc shf = (Shfunc) hn;
+    int f = shf->node.flags;
+
+    if (!(f & PM_UNDEFINED) || (f & DISABLED))
+	return;
+    fputs("builtin autoload", aok_tab_out);
+    if (f & PM_UNALIASED)
+	fputs(" -U", aok_tab_out);		/* do not alias-expand on load */
+    if (f & PM_TAGGED_LOCAL)
+	fputs(" -T", aok_tab_out);		/* traced, non-recursively */
+    else if (f & PM_TAGGED)
+	fputs(" -t", aok_tab_out);		/* traced */
+    if (f & PM_KSHSTORED)
+	fputs(" -k", aok_tab_out);
+    if (f & PM_ZSHSTORED)
+	fputs(" -z", aok_tab_out);
+    fputs(" -- ", aok_tab_out);
+    quotedzputs(shf->node.nam, aok_tab_out);
+    fputc('\n', aok_tab_out);
+}
+
+/* The command hash table, but only the entries a user PUT there.
+ *
+ * The state emitted `hash -dL` (named directories) and nothing for cmdnamtab,
+ * so `hash mycmd=/bin/echo; mycmd hi` said "command not found" in the child --
+ * and the child is where it runs, because zsh's late fork site re-launches for
+ * any external command that is not the last thing the shell will do. Worse when
+ * the name shadows a real one: `hash ls=/bin/echo; ls SHADOWED` ran the real
+ * ls, with no diagnostic at all.
+ *
+ * HASHED is the bit `hash name=path` sets. The rest of cmdnamtab is the PATH
+ * cache, which is derived from a $path the state already carries and which the
+ * child rebuilds for itself on demand -- emitting it would be a line per
+ * external command the parent had ever run, paid on every subshell, to say what
+ * the child can work out. printcmdnamnode writes the same two shapes; this is
+ * its PRINT_LIST branch for a HASHED node. */
+static void aok_emit_one_hashed(HashNode hn, UNUSED(int flags))
+{
+    Cmdnam cn = (Cmdnam) hn;
+
+    if (!(cn->node.flags & HASHED))
+	return;
+    fputs("builtin hash ", aok_tab_out);
+    if (cn->node.nam[0] == '-')
+	fputs("-- ", aok_tab_out);
+    quotedzputs(cn->node.nam, aok_tab_out);
+    fputc('=', aok_tab_out);
+    quotedzputs(cn->u.cmd, aok_tab_out);
+    fputc('\n', aok_tab_out);
+}
+
+/* An option's canonical name from its index. options.c keeps the table itself
+ * private, so this is a scan; it is only ever used for the handful of options
+ * named in an `emulate ... -c` line. */
+static __thread int aok_wanted_optno;
+static __thread const char *aok_found_optname;
+
+static void aok_match_optno(HashNode hn, UNUSED(int flags))
+{
+    Optname on = (Optname) hn;
+
+    if (on->optno == aok_wanted_optno && !(on->node.flags & (EMULATE_UNUSED << 2)))
+	aok_found_optname = on->node.nam;
+}
+
+static const char *aok_optname(int optno)
+{
+    aok_wanted_optno = optno;
+    aok_found_optname = NULL;
+    scanhashtable(optiontab, 0, 0, 0, aok_match_optno, 0);
+    return aok_found_optname;
+}
+
+/* One shell function, written the way rule (9) writes them. */
+static void aok_emit_funcdef(FILE *out, Shfunc shf)
+{
+    char *body = shf->funcdef ? getpermtext(shf->funcdef, NULL, 1) : NULL;
+    char *redir = shf->redir ? getpermtext(shf->redir, NULL, 1) : NULL;
+
+    fputs("function ", out);
+    quotedzputs(shf->node.nam, out);
+    fprintf(out, " {\n\t%s\n}", body ? body : ":");
+    if (redir)
+	fprintf(out, " %s", redir);
+    fputc('\n', out);
+    if (body)
+	zsfree(body);
+    if (redir)
+	zsfree(redir);
+}
+
+/* TRAPEXIT, which the script cannot see and aok_emit_traps deliberately skips.
+ *
+ * Both halves of that were right on their own. A function trap IS an ordinary
+ * shfunctab entry and does cross with the other functions -- TRAPINT and
+ * TRAPZERR do exactly that -- and a `trap '...' EXIT` LIST trap genuinely must
+ * not cross, which is what execcmd_fork says when it zeroes sigtrapped[SIGEXIT]
+ * in a forked child. TRAPEXIT falls between them: zsh's own subshell keeps it
+ * (entersubsh preserves ZSIG_FUNC), so `print A=$(print B)` under a TRAPEXIT
+ * prints the trap's output INSIDE the substitution.
+ *
+ * It went missing because starttrapscope() does `unsettrap(SIGEXIT)` on entry
+ * to every shell function, and unsettrap on a ZSIG_FUNC trap REMOVES the
+ * function from shfunctab -- so for the whole life of the serialiser's
+ * anonymous function, which is exactly when `${(@k)functions}` is read,
+ * TRAPEXIT does not exist. `whence -w TRAPEXIT` in the child said "none". By
+ * the time this runs, execstring has returned and endtrapscope has put it
+ * back. */
+static void aok_emit_exit_trap(int fd)
+{
+    FILE *out;
+    Shfunc shf;
+
+    if (!sigtrapped[SIGEXIT] || !(sigtrapped[SIGEXIT] & ZSIG_FUNC))
+	return;
+    shf = (Shfunc) shfunctab->getnode2(shfunctab, "TRAPEXIT");
+    if (!shf || (shf->node.flags & (PM_UNDEFINED|DISABLED)))
+	return;
+    if (!(out = fdopen(dup(fd), "w")))
+	return;
+    /* Defining a function whose name is TRAP<SIG> installs the trap; exec.c
+     * does the settrap() itself, so there is nothing else to say. */
+    aok_emit_funcdef(out, shf);
+    fclose(out);
+}
+
+/* Per-function STICKY emulation.
+ *
+ * `emulate ksh -c 'f() { ... }'` gives f a sticky emulation that zsh re-applies
+ * on every call, so f keeps answering ksh's word-splitting rules however the
+ * caller's options are set. Nothing zsh prints about a function mentions it, so
+ * the child defined a plain function that just inherited the ambient options
+ * and the answer changed -- in both directions: a sticky-zsh function saw the
+ * parent's shwordsplit that it is supposed to be immune to, and a sticky-ksh
+ * one lost the shwordsplit it is supposed to impose.
+ *
+ * The redefinition is the whole point: the script has already emitted this
+ * function the ordinary way, and this second definition -- inside `emulate MODE
+ * -c` -- replaces it with one that carries the sticky record. Paid only by
+ * shells that have such a function, which is why it is not the only path.
+ *
+ * Note that the body is deliberately re-parsed under MODE here, unlike every
+ * other line of the state: that is the emulation the parent parsed it under. */
+static void aok_emit_one_sticky(HashNode hn, UNUSED(int flags))
+{
+    Shfunc shf = (Shfunc) hn;
+    Emulation_options st = shf->sticky;
+    FILE *out = aok_tab_out;
+    const char *mode;
+    char *def;
+    int i;
+
+    if (!st || (shf->node.flags & (PM_UNDEFINED|DISABLED)))
+	return;
+
+    switch (st->emulation & ((1 << 5) - 1)) {
+    case EMULATE_CSH: mode = "csh"; break;
+    case EMULATE_KSH: mode = "ksh"; break;
+    case EMULATE_SH:  mode = "sh";  break;
+    default:	      mode = "zsh"; break;
+    }
+    fprintf(out, "builtin emulate %s%s", (st->emulation & EMULATE_FULLY) ? "-R " : "",
+	    mode);
+    /* The options named in the original `emulate` line, which are part of the
+     * sticky record and not of the mode. */
+    for (i = 0; i < st->n_on_opts; i++) {
+	const char *nm = aok_optname((int) st->on_opts[i]);
+	if (nm)
+	    fprintf(out, " -o %s", nm);
+    }
+    for (i = 0; i < st->n_off_opts; i++) {
+	const char *nm = aok_optname((int) st->off_opts[i]);
+	if (nm)
+	    fprintf(out, " +o %s", nm);
+    }
+
+    /* The definition itself, as the single argument of -c. It is built into a
+     * string rather than written out, because it has to be quoted as one word;
+     * quotedzputs writes the $'...' form for the newlines in it. */
+    {
+	char *body = shf->funcdef ? getpermtext(shf->funcdef, NULL, 1) : NULL;
+	char *redir = shf->redir ? getpermtext(shf->redir, NULL, 1) : NULL;
+	char *nam = quotedzputs(shf->node.nam, NULL);
+	size_t n = strlen(nam) + (body ? strlen(body) : 1) +
+	    (redir ? strlen(redir) : 0) + 32;
+
+	def = (char *) zhalloc(n);
+	snprintf(def, n, "function %s {\n\t%s\n}%s%s", nam,
+		 body ? body : ":", redir ? " " : "", redir ? redir : "");
+	if (body)
+	    zsfree(body);
+	if (redir)
+	    zsfree(redir);
+    }
+    fputs(" -c ", out);
+    quotedzputs(def, out);
+    fputc('\n', out);
+}
+
+/* zmodload's AUTOLOAD registrations -- `zmodload -ab zsh/datetime strftime` and
+ * its -ap, -af and -ac relatives.
+ *
+ * The state emitted `zmodload -L`, which lists modules that are LOADED. A
+ * registration the parent made but never triggered is not a loaded module, so
+ * it vanished: the child answered "command not found: strftime", "unknown
+ * function: sqrt", and gave back a $mapfile that was not an association.
+ * (Trigger one in the parent and it becomes a loaded module, which is why this
+ * only shows up for registrations nothing has used yet.)
+ *
+ * The awkward part is that `zmodload -aL` lists about seventy of them in a
+ * shell that has done nothing at all, because a zsh is BORN with that table --
+ * and re-stating what the child already knows would be seventy commands per
+ * subshell. So the shell records its own table once, at startup, before any
+ * user code has run (aok_snapshot_autoloads, called from init.c), and this
+ * emits the difference. Parent and child are the same binary, so the two
+ * snapshots agree by construction.
+ *
+ * `-i` on every line for the same reason rule (5) guards readonly parameters:
+ * a registration that collides with one the child already has is an ERROR, and
+ * an error aborts the rest of the sourced state. */
+struct aok_autoreg {
+    char kind;			/* b, p, f, c or C, as zmodload spells them */
+    char *name;
+    char *module;
+};
+
+static __thread struct aok_autoreg *aok_def_auto;
+static __thread int aok_ndef_auto, aok_def_auto_cap;
+
+/* Filled while scanning: either recording the defaults, or emitting the ones
+ * that are not defaults. */
+static __thread int aok_auto_recording;
+
+static void aok_note_autoreg(char kind, const char *name, const char *module)
+{
+    int i;
+
+    if (aok_auto_recording) {
+	if (aok_ndef_auto == aok_def_auto_cap) {
+	    int ncap = aok_def_auto_cap ? aok_def_auto_cap * 2 : 128;
+	    struct aok_autoreg *nv = (struct aok_autoreg *)
+		zrealloc(aok_def_auto, ncap * sizeof(*nv));
+	    if (!nv)
+		return;
+	    aok_def_auto = nv;
+	    aok_def_auto_cap = ncap;
+	}
+	aok_def_auto[aok_ndef_auto].kind = kind;
+	aok_def_auto[aok_ndef_auto].name = ztrdup(name);
+	aok_def_auto[aok_ndef_auto].module = ztrdup(module);
+	aok_ndef_auto++;
+	return;
+    }
+
+    for (i = 0; i < aok_ndef_auto; i++)
+	if (aok_def_auto[i].kind == kind &&
+	    !strcmp(aok_def_auto[i].name, name) &&
+	    !strcmp(aok_def_auto[i].module, module))
+	    return;		/* the child is born with this one */
+
+    fprintf(aok_tab_out, "builtin zmodload -i -a%c ", kind);
+    quotedzputs(module, aok_tab_out);
+    fputc(' ', aok_tab_out);
+    quotedzputs(name, aok_tab_out);
+    fputc('\n', aok_tab_out);
+}
+
+static void aok_scan_one_autobin(HashNode hn, UNUSED(int flags))
+{
+    Builtin bn = (Builtin) hn;
+
+    /* BINF_ADDED means the module is loaded and this is the real builtin;
+     * autoloadscan uses the same test. */
+    if ((bn->node.flags & BINF_ADDED) || !bn->optstr)
+	return;
+    aok_note_autoreg('b', bn->node.nam, bn->optstr);
+}
+
+static void aok_scan_one_autoparam(HashNode hn, UNUSED(int flags))
+{
+    Param pm = (Param) hn;
+
+    if (!(pm->node.flags & PM_AUTOLOAD) || !pm->u.str)
+	return;
+    aok_note_autoreg('p', pm->node.nam, pm->u.str);
+}
+
+static void aok_scan_autoloads(void)
+{
+    MathFunc mf;
+    Conddef cd;
+
+    scanhashtable(builtintab, 0, 0, 0, aok_scan_one_autobin, 0);
+    scanhashtable(realparamtab, 0, 0, 0, aok_scan_one_autoparam, 0);
+    for (mf = mathfuncs; mf; mf = mf->next)
+	if (!(mf->flags & MFF_USERFUNC) && mf->module)
+	    aok_note_autoreg('f', mf->name, mf->module);
+    for (cd = condtab; cd; cd = cd->next)
+	if (cd->module)
+	    aok_note_autoreg((cd->flags & CONDF_INFIX) ? 'C' : 'c',
+			     cd->name, cd->module);
+}
+
+/* Called from init.c once the compiled-in modules have registered themselves
+ * and before any line of user code has run. */
+/**/
+void aok_snapshot_autoloads(void)
+{
+    if (aok_ndef_auto)
+	return;
+    aok_auto_recording = 1;
+    aok_scan_autoloads();
+    aok_auto_recording = 0;
+}
+
+/* The in-memory history list, which travels as a history FILE rather than in
+ * the state script.
+ *
+ * `fc` in a subshell said "no such event: 0", because the child started with an
+ * empty list -- and a pipeline element is itself a re-launch, so even the
+ * ordinary `fc -l -3 | grep` idiom failed in a shell whose own history was
+ * perfectly intact.
+ *
+ * The obvious way to put a line into another shell's history is `print -s`, and
+ * it is the wrong one: it is one command per entry, and a shell with 3000
+ * entries paid 24ms on EVERY subshell to replay them -- eight times the whole
+ * cost of the subshell. Batching them into an array and looping was 17ms, so
+ * the cost is not the parsing. It is `print -s`. zsh's own reader does the same
+ * 3000 entries in 1.6ms, so this writes what that reader reads.
+ *
+ * It has to be a file and not the state pipe, because readhistfile stats its
+ * argument and returns immediately when st_size is 0 -- which is what a pipe
+ * always reports, so `fc -R /dev/fd/N` silently read nothing. The file is
+ * mkstemp'd with mode 0600, and the CHILD unlinks it as soon as it has read it
+ * (aok_child_init), which is the only moment anything can know it is finished
+ * with. A child that dies before that leaves one 0600 temp file behind, which
+ * is the same exposure zsh's own `=( ... )` has.
+ *
+ * A shell reading a script has no history at all -- zsh records lines it read
+ * interactively, plus whatever `print -s` put there -- so a script pays nothing
+ * for this, not even the temp file.
+ *
+ * The format is zsh's own EXTENDED_HISTORY line, `: <start>:<duration>;<text>`,
+ * whatever the parent's setting of that option: readhistfile detects the shape
+ * rather than consulting the option, and writing it unconditionally is what
+ * carries the timestamps that `fc -d` and `fc -f` print. The escaping is
+ * savehistfile's, verbatim -- an embedded newline becomes backslash-newline and
+ * a line ending in backslashes gets a trailing space, so that the reader's
+ * continuation rule puts back exactly what was there. */
+static char *aok_write_hist_file(void)
+{
+    char *fname = NULL, *dupname;
+    FILE *out;
+    Histent he, first;
+    int fd;
+
+    if (!hist_ring)
+	return NULL;
+    if ((fd = gettempfile(NULL, 1, &fname)) < 0)
+	return NULL;
+    if (!(out = fdopen(fd, "w"))) {
+	close(fd);
+	unlink(fname);
+	return NULL;
+    }
+
+    /* hist_ring is the newest entry and hist_ring->down the oldest, so walking
+     * `down` from there writes them oldest first, which is the order that gives
+     * the child the same event numbers the parent had. */
+    first = hist_ring->down;
+    he = first;
+    do {
+	char *t;
+	int end_backslashes = 0;
+
+	if (!he->node.nam || !*he->node.nam ||
+	    (he->node.flags & (HIST_TMPSTORE|HIST_DUP))) {
+	    he = he->down;
+	    continue;
+	}
+	fprintf(out, ": %ld:%ld;", (long) he->stim,
+		he->ftim ? (long) (he->ftim - he->stim) : 0L);
+	t = he->node.nam;
+	/* The overwhelmingly common entry is one line with no backslash in it,
+	 * and writing it a character at a time cost more than the rest of this
+	 * function put together at 3000 entries. */
+	if (!strchr(t, '\n') && !strchr(t, '\\')) {
+	    fputs(t, out);
+	} else {
+	    for (; *t; t++) {
+		if (*t == '\n')
+		    fputc('\\', out);
+		end_backslashes = (*t == '\\' || (end_backslashes && *t == ' '));
+		fputc(*t, out);
+	    }
+	    if (end_backslashes)
+		fputc(' ', out);
+	}
+	fputc('\n', out);
+	he = he->down;
+    } while (he != first);
+
+    fclose(out);
+    /* gettempfile's heap name does not outlive the next popheap. */
+    dupname = ztrdup(fname);
+    return dupname;
+}
+
+/* The four scans above, in one place, so that aok_write_state reads as a list
+ * of what crosses rather than a list of file descriptors. */
+static void aok_emit_tables(int fd)
+{
+    FILE *out = fdopen(dup(fd), "w");
+
+    if (!out)
+	return;
+    aok_tab_out = out;
+    aok_scan_autoloads();
+    scanhashtable(shfunctab, 0, 0, 0, aok_emit_one_autoload, 0);
+    scanhashtable(cmdnamtab, 0, 0, 0, aok_emit_one_hashed, 0);
+    scanhashtable(shfunctab, 0, 0, 0, aok_emit_one_sticky, 0);
+    aok_tab_out = NULL;
     fclose(out);
 }
 
@@ -703,7 +1424,7 @@ static void aok_emit_traps(int fd, int flags)
  * carry them: the only way to have one is `typeset -F SECONDS`, and SECONDS is
  * a clock the child reads rather than a value it inherits.
  */
-static FILE *aok_float_out;
+static __thread FILE *aok_float_out;
 
 static void aok_emit_one_float(HashNode hn, UNUSED(int flags))
 {
@@ -725,7 +1446,7 @@ static void aok_emit_one_float(HashNode hn, UNUSED(int flags))
      * sourced state. */
     if (pmf & PM_READONLY)
 	fprintf(aok_float_out, "(( ${+parameters[%s]} )) || ", hn->nam);
-    fputs("typeset -g", aok_float_out);
+    fputs("builtin typeset -g", aok_float_out);
     if (pmf & PM_EXPORTED)
 	fputs(" -x", aok_float_out);
     if (pmf & PM_HIDEVAL)
@@ -777,16 +1498,16 @@ static void aok_emit_epilogue(int fd)
 	return;
     /* xtrace and verbose here rather than with the other options, so that the
      * state itself is not traced into the user's stderr. */
-    fprintf(out, "%s xtrace\n", isset(XTRACE) ? "setopt" : "unsetopt");
-    fprintf(out, "%s verbose\n", isset(VERBOSE) ? "setopt" : "unsetopt");
-    fprintf(out, "%s printexitvalue\n",
+    fprintf(out, "builtin %s xtrace\n", isset(XTRACE) ? "setopt" : "unsetopt");
+    fprintf(out, "builtin %s verbose\n", isset(VERBOSE) ? "setopt" : "unsetopt");
+    fprintf(out, "builtin %s printexitvalue\n",
 	    isset(PRINTEXITVALUE) ? "setopt" : "unsetopt");
     /* Rule (6): after every assignment the state made. */
-    fprintf(out, "%s errexit\n", isset(ERREXIT) ? "setopt" : "unsetopt");
-    fprintf(out, "%s nounset\n", isset(UNSET) ? "unsetopt" : "setopt");
+    fprintf(out, "builtin %s errexit\n", isset(ERREXIT) ? "setopt" : "unsetopt");
+    fprintf(out, "builtin %s nounset\n", isset(UNSET) ? "unsetopt" : "setopt");
     /* Rule (1)'s other half. `unsetopt` when the parent genuinely had
      * NO_ALIASES, which is not the same as leaving it alone. */
-    fprintf(out, "%s aliases\n", isset(ALIASESOPT) ? "setopt" : "unsetopt");
+    fprintf(out, "builtin %s aliases\n", isset(ALIASESOPT) ? "setopt" : "unsetopt");
     /* A bare assignment, not `typeset -g`, because this line is on the wrong
      * side of the `setopt aliases` above it and the state has by now defined
      * every alias and function the parent had. With `alias typeset='echo
@@ -888,7 +1609,7 @@ void aok_spawn_close(struct aok_spawn *sp, int fd)
  *
  * One variable rather than four: the child validates the whole thing once,
  * against the same spawner check `$$` gets. */
-static char *aok_inherit_string(zlong subshell)
+static char *aok_inherit_string(zlong subshell, int flags)
 {
     size_t cap = 128 + (size_t) numpipestats * 12, len;
     char *s = (char *) zalloc(cap);
@@ -899,9 +1620,15 @@ static char *aok_inherit_string(zlong subshell)
      * missing one would have it freeing a borrowed environ string. */
     if (!s)
 	return ztrdup(AOK_VAR_INHERIT "=");
-    len = (size_t) snprintf(s, cap, "%s=%lld/%lld/%lld/", AOK_VAR_INHERIT,
+    /* The fourth field is AOK_SUB_INCMD, which is not state a fork copies but
+     * travels here anyway: it rides the validation this variable already has,
+     * and inventing a sixth AOK_ZSH_* variable to carry one bit would mean a
+     * second thing for the child to check and a second thing to strip out of
+     * the environment of every program it runs. */
+    len = (size_t) snprintf(s, cap, "%s=%lld/%lld/%lld/%d/", AOK_VAR_INHERIT,
 			    (long long) lastpid, (long long) ppid,
-			    (long long) subshell);
+			    (long long) subshell,
+			    (flags & AOK_SUB_INCMD) ? 1 : 0);
     for (i = 0; i < numpipestats && len + 13 < cap; i++)
 	len += (size_t) snprintf(s + len, cap - len, i ? ",%d" : "%d",
 				 pipestats[i]);
@@ -915,7 +1642,8 @@ static char *aok_inherit_string(zlong subshell)
  * vector is freed with free() and only those four with it. Nothing has to
  * outlive the spawn: the shim packs argv and envp into flat buffers before the
  * child starts. */
-static char **aok_relaunch_env(int state_fd, zlong subshell)
+static char **aok_relaunch_env(int state_fd, zlong subshell, int flags,
+			       const char *histfile)
 {
     char **src, **vec;
     size_t n, i, j;
@@ -924,7 +1652,7 @@ static char **aok_relaunch_env(int state_fd, zlong subshell)
     src = environ;
     for (n = 0; src && src[n]; n++)
 	;
-    vec = (char **) zalloc((n + 5) * sizeof(char *));
+    vec = (char **) zalloc((n + 6) * sizeof(char *));
     if (!vec)
 	return NULL;
 
@@ -932,9 +1660,23 @@ static char **aok_relaunch_env(int state_fd, zlong subshell)
 	if (!strncmp(src[i], AOK_VAR_FD "=", sizeof(AOK_VAR_FD)) ||
 	    !strncmp(src[i], AOK_VAR_DOLLAR "=", sizeof(AOK_VAR_DOLLAR)) ||
 	    !strncmp(src[i], AOK_VAR_LASTVAL "=", sizeof(AOK_VAR_LASTVAL)) ||
+	    !strncmp(src[i], AOK_VAR_HISTFILE "=", sizeof(AOK_VAR_HISTFILE)) ||
 	    !strncmp(src[i], AOK_VAR_INHERIT "=", sizeof(AOK_VAR_INHERIT)))
 	    continue;
 	vec[j++] = src[i];
+    }
+    /* Always present, empty when this shell has no history, so that
+     * aok_relaunch_env_free can go on finding its own entries by counting back
+     * from the end of the vector. */
+    {
+	char *hf = (char *) zalloc(sizeof(AOK_VAR_HISTFILE) + 1 +
+				   (histfile ? strlen(histfile) : 0));
+	if (hf) {
+	    sprintf(hf, "%s=%s", AOK_VAR_HISTFILE, histfile ? histfile : "");
+	    vec[j++] = hf;
+	} else {
+	    vec[j++] = ztrdup(AOK_VAR_HISTFILE "=");
+	}
     }
     sprintf(buf, "%s=%d", AOK_VAR_FD, state_fd);
     vec[j++] = ztrdup(buf);
@@ -945,7 +1687,7 @@ static char **aok_relaunch_env(int state_fd, zlong subshell)
     vec[j++] = ztrdup(buf);
     sprintf(buf, "%s=%lld", AOK_VAR_LASTVAL, (long long) lastval);
     vec[j++] = ztrdup(buf);
-    vec[j++] = aok_inherit_string(subshell);
+    vec[j++] = aok_inherit_string(subshell, flags);
     vec[j] = NULL;
     return vec;
 }
@@ -958,11 +1700,12 @@ static void aok_relaunch_env_free(char **vec)
 	return;
     for (n = 0; vec[n]; n++)
 	;
-    if (n >= 4) {
+    if (n >= 5) {
 	zsfree(vec[n - 1]);
 	zsfree(vec[n - 2]);
 	zsfree(vec[n - 3]);
 	zsfree(vec[n - 4]);
+	zsfree(vec[n - 5]);
     }
     zfree(vec, 0);
 }
@@ -993,11 +1736,17 @@ static void aok_write_state(int fd, int flags)
      * wherever it comes from, and nothing here has any business forking. */
     aok_serialising++;
 
+    /* The order is rule (4)'s: everything the child has to PARSE first, under
+     * the zsh defaults its own printers wrote it for, and the options that
+     * change what parsing means last of all. */
     if (!getenv("AOK_ZSH_NO_STATE")) {
-	aok_emit_options(fd);
+	aok_emit_prologue(fd);
 	aok_run_state_script(fd);
+	aok_emit_tables(fd);
+	aok_emit_exit_trap(fd);
 	aok_emit_floats(fd);
 	aok_emit_traps(fd, flags);
+	aok_emit_options(fd);
     }
     aok_emit_epilogue(fd);
 
@@ -1010,10 +1759,13 @@ static void aok_write_state(int fd, int flags)
 	fflush(stderr);
 	fprintf(stderr, "----- AOK ZSH STATE -----\n");
 	fflush(stderr);
-	aok_emit_options(2);
+	aok_emit_prologue(2);
 	aok_run_state_script(2);
+	aok_emit_tables(2);
+	aok_emit_exit_trap(2);
 	aok_emit_floats(2);
 	aok_emit_traps(2, flags);
+	aok_emit_options(2);
 	aok_emit_epilogue(2);
 	fprintf(stderr, "----- END -----\n");
 	fflush(stderr);
@@ -1031,7 +1783,7 @@ static void aok_write_state(int fd, int flags)
  * procsubstpid, the job table) exactly as the fork version had it. */
 pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
 {
-    char *argv[7], *cmd, **envp;
+    char *argv[7], *cmd, **envp, *histfile;
     void *fa = NULL, *attr = NULL;
     int statepipe[2], err, i;
     pid_t pid;
@@ -1137,6 +1889,36 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
 	 * matches it: a background job keeps the ignore. */
 	if (!(sp->flags & AOK_SUB_ASYNC))
 	    sigaddset(&dfl, SIGQUIT);
+	/* And the same rule generalised, which is what SIGQUIT above is one
+	 * instance of: `trap '' SIG` installs a REAL SIG_IGN, exec preserves
+	 * SIG_IGN, and entersubsh's first act in a forked child is to unsettrap
+	 * everything up to SIGCOUNT -- which puts each of those back to the
+	 * default. Nothing did that here, so with `trap '' INT` in the parent,
+	 * `$(/bin/sh -c 'kill -INT $$; echo survived')` printed "survived"
+	 * where a fork prints nothing: the ignore had reached a
+	 * great-grandchild that never asked for it. Confirmed the same way for
+	 * TERM, PIPE and USR1.
+	 *
+	 * The two exceptions are entersubsh's own, not conveniences:
+	 * POSIXTRAPS is the option that makes an ignored trap survive the
+	 * unsettrap loop, and a background job re-ignores INT and QUIT for
+	 * itself (settrap(SIGINT, NULL, 0) under ESUB_ASYNC) so resetting them
+	 * would be undone a moment later anyway. ZSIG_FUNC cannot appear here
+	 * -- a function trap is not an ignore -- but the test is written the
+	 * way entersubsh writes it so the two stay comparable. */
+	if (!(sp->flags & AOK_SUB_KEEPTRAP) && !isset(POSIXTRAPS)) {
+	    int sig;
+
+	    for (sig = 1; sig <= SIGCOUNT; sig++) {
+		if (!(sigtrapped[sig] & ZSIG_IGNORED) ||
+		    (sigtrapped[sig] & ZSIG_FUNC))
+		    continue;
+		if ((sp->flags & AOK_SUB_ASYNC) &&
+		    (sig == SIGINT || sig == SIGQUIT))
+		    continue;
+		sigaddset(&dfl, sig);
+	    }
+	}
 	posix_spawnattr_setsigdefault(&attr, &dfl);
 	posix_spawnattr_setflags(&attr, flags);
     }
@@ -1171,8 +1953,10 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
      * child increments while re-parsing it, exactly as an already-forked child
      * of real zsh does not (`( print $ZSH_SUBSHELL ) | cat` is 1, not 2). So
      * that one site says so and this adds nothing on top of it. */
+    histfile = aok_write_hist_file();
     envp = aok_relaunch_env(statepipe[0],
-			    zsh_subshell + (sp->subsh_counted ? 0 : 1));
+			    zsh_subshell + (sp->subsh_counted ? 0 : 1),
+			    sp->flags, histfile);
     err = posix_spawn(&pid, AOK_ZSH_PATH, &fa, attr ? &attr : NULL, argv, envp);
     aok_relaunch_env_free(envp);
     if (attr)
@@ -1181,11 +1965,18 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
     zsfree(cmd);
 
     if (err != 0) {
+	/* Nothing is going to read it, so nothing is going to remove it. */
+	if (histfile) {
+	    unlink(histfile);
+	    zsfree(histfile);
+	}
 	zclose(statepipe[0]);
 	zclose(statepipe[1]);
 	errno = err;
 	return (pid_t) -1;
     }
+    if (histfile)
+	zsfree(histfile);
 
     zclose(statepipe[0]);
     aok_write_state(statepipe[1], sp->flags);
@@ -1263,7 +2054,7 @@ done:
 static char *aok_adopt_inherit(int validated)
 {
     char *raw, *value, *end, *pipes = NULL;
-    long long bang, parent, subshell;
+    long long bang, parent, subshell, incmd;
 
     raw = getsparam(AOK_VAR_INHERIT);
     if (!raw)
@@ -1287,16 +2078,44 @@ static char *aok_adopt_inherit(int validated)
     subshell = strtoll(raw, &end, 10);
     if (end == raw || *end != '/' || errno != 0)
 	goto done;
-    if (bang < 0 || parent < 0 || subshell < 0)
+    raw = end + 1;
+    errno = 0;
+    incmd = strtoll(raw, &end, 10);
+    if (end == raw || *end != '/' || errno != 0)
+	goto done;
+    if (bang < 0 || parent < 0 || subshell < 0 || incmd < 0)
 	goto done;
 
     lastpid = (zlong) bang;
     ppid = (zlong) parent;
     zsh_subshell = (zlong) subshell;
+    aok_relaunch_incmd = incmd != 0;
     pipes = ztrdup(end + 1);
 done:
     zsfree(value);
     return pipes;
+}
+
+/* The other half of aok_write_hist_file: read the parent's history, then take
+ * the file away.
+ *
+ * The unlink is here rather than in the parent because this is the first moment
+ * anything knows the file has been read -- the parent has no way to wait for
+ * it without waiting for the whole child.
+ *
+ * readhistfile takes and drops a <file>.LOCK of its own while it reads, which
+ * is why the unlink comes after it rather than before. The lock is pointless
+ * here -- the file is a private mkstemp handed to exactly one child, so it is
+ * serialising against nobody -- but skipping it would mean exporting hist.c's
+ * static lockhistct and regenerating hist.pro, and it measures 0.2ms of a
+ * subshell that only pays it at all when the parent has history. */
+static void aok_read_hist_file(char *histfile)
+{
+    if (!histfile)
+	return;
+    readhistfile(histfile, 0, 0);
+    unlink(unmeta(histfile));
+    zsfree(histfile);
 }
 
 static void aok_restore_pipestatus(char *pipes)
@@ -1343,12 +2162,31 @@ static void aok_restore_lastval(char *lastvalstr)
 /**/
 void aok_child_init(void)
 {
-    char *fdstr, *lastvalstr, *pipes, *end;
-    int fd, devnull, saved_err = -1;
+    char *fdstr, *lastvalstr, *pipes, *end, *histfile = NULL;
+    int fd, devnull, saved_err = -1, incmd;
     long v;
     enum source_return ret = SOURCE_OK;
 
     pipes = aok_adopt_inherit(aok_adopt_dollar());
+
+    /* AOK_SUB_INCMD is about the command this shell was LAUNCHED to run, and
+     * the state script gets executed first -- whose very first sublist would
+     * otherwise consume the flag and leave the real command with nothing. Held
+     * aside here and installed at the bottom of this function, after the state
+     * and after the history, so the next sublist to see it is the right one. */
+    incmd = aok_relaunch_incmd;
+    aok_relaunch_incmd = 0;
+
+    /* The parent's history, which is read AFTER the state -- HISTSIZE arrives
+     * with the state and is what bounds the list. Copied before the unbind for
+     * the reason the two below it give, and unbound whether it is used or not
+     * so that it reaches neither a program this shell runs nor the state this
+     * shell hands its own children. */
+    if ((end = getsparam(AOK_VAR_HISTFILE)) != NULL) {
+	if (*end)
+	    histfile = ztrdup(end);
+	unsetparam(AOK_VAR_HISTFILE);
+    }
 
     /* Copied before the unbind: getsparam returns a pointer into the parameter
      * table, which unsetparam frees. */
@@ -1370,6 +2208,8 @@ void aok_child_init(void)
 	unsetparam(AOK_VAR_FD);
     }
     if (!fdstr) {
+	aok_relaunch_incmd = incmd;
+	aok_read_hist_file(histfile);
 	aok_restore_lastval(lastvalstr);
 	aok_restore_pipestatus(pipes);
 	return;
@@ -1377,6 +2217,8 @@ void aok_child_init(void)
     v = strtol(fdstr, &end, 10);
     if (*end != '\0' || v < 0) {
 	zsfree(fdstr);
+	aok_relaunch_incmd = incmd;
+	aok_read_hist_file(histfile);
 	aok_restore_lastval(lastvalstr);
 	aok_restore_pipestatus(pipes);
 	return;
@@ -1399,7 +2241,21 @@ void aok_child_init(void)
     }
 
     aok_source_fd = fd;
+    /* And the child's half of the same suppression the parent does around
+     * aok_run_state_script -- but through `intrap` rather than the ZSIG_IGNORED
+     * bit, because here the traps do not exist yet: the state is what CREATES
+     * them, and the `builtin trap -- 'print D' DEBUG` line partway through it
+     * would otherwise fire for every line after itself. `trap "print D" DEBUG;
+     * ( print in )` printed ten D's where zsh prints two, and half of them
+     * arrived before any of the user's own output.
+     *
+     * intrap is exactly zsh's flag for "a synchronous trap must not run in
+     * here": dotrapargs returns immediately for EXIT, DEBUG and ZERR while it
+     * is set, and execlist skips its two DEBUG sites outright. It is the same
+     * answer at both ends of the pipe; only the way of saying it differs. */
+    intrap++;
     ret = source("(aok subshell state)");
+    intrap--;
 
     if (saved_err >= 0) {
 	fflush(stderr);
@@ -1423,6 +2279,11 @@ void aok_child_init(void)
 	    write(2, msg, (size_t) n);
     }
     aok_inherited_ntraps = nsigtrapped;
+    aok_relaunch_incmd = incmd;
+
+    /* After the state, because HISTSIZE came with it and HISTSIZE is what
+     * bounds the list this reads into. */
+    aok_read_hist_file(histfile);
 
     /* Errors inside the state are the state's problem, not the command's. */
     errflag = 0;

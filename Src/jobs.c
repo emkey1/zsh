@@ -1618,7 +1618,41 @@ havefiles(void)
     for (i = 1; i <= maxjob; i++)
 	if (jobtab[i].stat && jobtab[i].filelist &&
 	    nonempty(jobtab[i].filelist)) {
-	    return 1;
+	    /* AOK: files to DELETE, which is what the comment above says this
+	     * question is -- not descriptors to close.
+	     *
+	     * A job's filelist holds both (addfilelist takes either a name or
+	     * an fd). A name is a temp file `=(...)` made, and the shell has to
+	     * outlive the command to unlink it, so it must not exec in place.
+	     * An fd is a `<(...)` pipe end under /dev/fd, or a pipeline's read
+	     * end: nothing to unlink, and the descriptor is exactly what the
+	     * command about to be exec'd is going to READ. Closing it is
+	     * housekeeping for a shell that carries on, and a shell that execs
+	     * does not carry on.
+	     *
+	     * Upstream counts both and pays one extra fork; here the fork is a
+	     * RE-LAUNCH, and for a command with a redirection the re-launch has
+	     * to hand over source text rather than the expanded words (see the
+	     * double-evaluation comment in execcmd_exec). That text still says
+	     * `<(...)`, so the child made a SECOND process substitution, found
+	     * a descriptor in its own filelist, and re-launched for the same
+	     * reason -- forever. `cat <(echo one) > /dev/null` hung until it
+	     * was killed, and never created the output file at all; so did
+	     * `echo data | tee >(sed ... > f) > /dev/null`. Without the
+	     * redirection the same line was fine, because then the child is
+	     * handed `cat /dev/fd/11` with nothing left to expand.
+	     *
+	     * So the fd entries stop forcing a fork. The tail-position command
+	     * execs in place with the descriptor already open, which is what it
+	     * wanted, and the regress has nothing to stand on. */
+	    LinkNode fn;
+
+	    for (fn = firstnode(jobtab[i].filelist); fn; incnode(fn)) {
+		Jobfile jf = (Jobfile) getdata(fn);
+
+		if (!jf->is_fd)
+		    return 1;
+	    }
 	}
     return 0;
 
