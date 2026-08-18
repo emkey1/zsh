@@ -641,7 +641,33 @@ static const char aok_state_script[] =
  * three modules to the shell being serialised. The guard is exact rather than
  * conservative: the only way to have a zstyle is to have run `zstyle`, which
  * is the same thing that loads the module. */
-"  zmodload -e zsh/zutil && zstyle -L\n"
+/* WRAPPED IN A FUNCTION, and called by aok_emit_deferred AFTER the options.
+ *
+ * Unlike everything else here, a zstyle's context pattern is compiled EAGERLY,
+ * at `zstyle' time (zutil.c's setstypat), not at first use -- so replaying these
+ * lines inline compiled every one of them under the `zsh -f' defaults the child
+ * still has at that point. The "WHY LAST" note below argues the option block can
+ * safely come after the state because patterns compile at first USE; that is
+ * true of function bodies and false of these. Measured, parent vs any
+ * re-launched child, with extendedglob set:
+ *
+ *     setopt extendedglob; zstyle ':t:a#' s v1
+ *     zstyle -s ':t:aaa' s v      parent v1   child MISS   zsh 5.9 child v1
+ *
+ * A function body is parsed when it is DEFINED and run when it is CALLED, which
+ * is exactly the two halves this needs: the text is still lexed under the zsh
+ * defaults its own printers wrote it for (rule (4)), and the eager compile
+ * happens later, under the parent's real options. Moving the lines themselves
+ * past the option block would have fixed the compile and broken the lexing --
+ * the `emulate sh' parse error the WHY LAST note describes.
+ *
+ * The `:' is there so that a shell with zsh/zutil loaded and no styles at all
+ * still emits a body zsh will parse. */
+"  if zmodload -e zsh/zutil; then\n"
+"    print -r -- '__aok_zst() { :'\n"
+"    zstyle -L\n"
+"    print -r -- '}'\n"
+"  fi\n"
 "  hash -dL\n"
 "  for __aok_k in \"${(@)__aok_ro}\"; do\n"
 "    print -rn -- \"(( \\${+parameters[$__aok_k]} )) || \"\n"
@@ -836,6 +862,31 @@ static void aok_emit_prologue(int fd)
     if (!out)
 	return;
     fputs("builtin setopt no_aliases\n", out);
+    fclose(out);
+}
+
+/* State that must be PARSED under the zsh defaults and RUN under the parent's
+ * options. Emitted after aok_emit_options for that reason -- see the block on
+ * the zstyle line in aok_state_script for what goes wrong at either extreme.
+ *
+ * Gated on the module in C rather than in the child, so a shell that has never
+ * used zstyle -- the overwhelming majority -- pays nothing at all: no line in
+ * the state, no builtin call per subshell.
+ *
+ * `builtin' on both calls for the reason the note above aok_shadowable_names
+ * gives: a user function named `functions' or `unfunction' would otherwise
+ * swallow this silently, which is the failure mode that made every zstyle
+ * disappear once already. */
+static void aok_emit_deferred(int fd)
+{
+    FILE *out;
+
+    if (!module_loaded("zsh/zutil"))
+	return;
+    if (!(out = fdopen(dup(fd), "w")))
+	return;
+    fprintf(out, "builtin functions __aok_zst >/dev/null 2>&1 && "
+		 "{ __aok_zst; builtin unfunction __aok_zst; }\n");
     fclose(out);
 }
 
@@ -2433,6 +2484,7 @@ static void aok_write_state(int fd, int flags)
 	aok_emit_specials(fd);
 	aok_emit_traps(fd, flags);
 	aok_emit_options(fd);
+	aok_emit_deferred(fd);
     }
     aok_emit_epilogue(fd);
 
@@ -2454,6 +2506,7 @@ static void aok_write_state(int fd, int flags)
 	aok_emit_specials(2);
 	aok_emit_traps(2, flags);
 	aok_emit_options(2);
+	aok_emit_deferred(2);
 	aok_emit_epilogue(2);
 	fprintf(stderr, "----- END -----\n");
 	fflush(stderr);
