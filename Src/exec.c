@@ -2575,13 +2575,13 @@ static int aok_multio_fd(LinkList redirs, int input, int output)
  * mn->pipe and mn->fds[] arrive at the same numbers the parent knows them by.
  *
  * AND EVERYTHING ELSE MUST BE CLOSED. The loop below is upstream's
- * closeallelse(), deleted with the fork it served, with zclose() replaced by
- * a close file action -- and the fidelity is the point: a
- * pump that still holds the write end of the pipe it is reading never sees
- * EOF, and `echo hi > a > b` would hang instead of finishing. It closes fds 0,
- * 1 and 2 along with the rest, which is why the pump has no diagnostics of its
- * own. It is also no more work than upstream did -- the forked child ran the
- * same loop over the same range, one close(2) at a time.
+ * closeallelse(), deleted along with the fork it served, with zclose()
+ * replaced by a close file action. The fidelity is the point: a pump still
+ * holding the write end of the pipe it is reading never sees EOF, and
+ * `echo hi > a > b` would hang rather than finish. It closes fds 0, 1 and 2
+ * with the rest, which is why the pump has no diagnostics of its own. And it
+ * is no more work than upstream did -- the forked child ran the same loop over
+ * the same range, one close(2) at a time.
  *
  * No spawn attributes: the shim already gives a spawned child the mask its
  * parent believes it has, minus what the shim itself holds, and the only thing
@@ -2596,6 +2596,14 @@ aok_multio_spawn(struct multio *mn)
     void *fa = NULL;
     int i, j, err;
     pid_t pid;
+
+    /* zfork()'s own first act, kept because the addproc() in closemn needs
+     * the room whether the child was forked or spawned. */
+    if (thisjob != -1 && thisjob >= jobtabsize - 1 && !expandjobtab()) {
+	zerr("job table full");
+	errno = EAGAIN;
+	return (pid_t) -1;
+    }
 
     /* "zsh-multio", the mode, the pipe, one per target, and the NULL. */
     argv = (char **) zhalloc((mn->ct + 4) * sizeof(char *));
@@ -2622,8 +2630,16 @@ aok_multio_spawn(struct multio *mn)
 	for (j = 0; j < mn->ct; j++)
 	    if (mn->fds[j] == i)
 		break;
-	if (j == mn->ct)
-	    posix_spawn_file_actions_addclose(&fa, i);
+	if (j != mn->ct)
+	    continue;
+	/* A close that did not make it into the list is a descriptor left
+	 * open in the pump, and the failure that follows is a hang rather
+	 * than an error -- so this is checked, unlike most addclose calls. */
+	if ((err = posix_spawn_file_actions_addclose(&fa, i)) != 0) {
+	    posix_spawn_file_actions_destroy(&fa);
+	    errno = err;
+	    return (pid_t) -1;
+	}
     }
 
     err = posix_spawn(&pid, AOK_MULTIO_PATH, &fa, NULL, argv, environ);
@@ -2643,7 +2659,7 @@ closemn(struct multio **mfds, int fd, int type)
 {
     if (fd >= 0 && mfds[fd] && mfds[fd]->ct >= 2) {
 	struct multio *mn = mfds[fd];
-	int i;
+	int i, spawnerr;
 	pid_t pid;
 	struct timespec bgtime;
 
@@ -2653,26 +2669,20 @@ closemn(struct multio **mfds, int fd, int type)
 	 * is set up to handle it.
 	 */
 	child_block();
-	/* zfork()'s two preliminaries, which the spawn does not inherit by
-	 * being a spawn: room in the job table for the process addproc is
-	 * about to record, and the start time the job will be measured from. */
-	if (thisjob != -1 && thisjob >= jobtabsize - 1 && !expandjobtab()) {
-	    zerr("job table full");
-	    for (i = 0; i < mn->ct; i++)
-		zclose(mn->fds[i]);
-	    zclose(mn->pipe);
-	    mfds[fd] = NULL;
-	    child_unblock();
-	    return;
-	}
+	/* The start time the job is measured from, which zfork() took for the
+	 * same reason: addproc() below records it either way. */
 	zgettime_monotonic_if_available(&bgtime);
 	pid = aok_multio_spawn(mn);
+	/* Kept across the closes below, which are close(2) calls of their own
+	 * and would otherwise be the errno the message reported. */
+	spawnerr = errno;
 	for (i = 0; i < mn->ct; i++)
 	    zclose(mn->fds[i]);
 	zclose(mn->pipe);
 	if (pid == -1) {
 	    /* The same message addfd() uses for the other ways a multio can
 	     * fail to be built, because to the user it is the same failure. */
+	    errno = spawnerr;
 	    zerr("multio failed for fd %d: %e", fd, errno);
 	    lastval = 1;
 	    mfds[fd] = NULL;
@@ -3411,12 +3421,18 @@ execcmd_exec(Estate state, Execcmd_params eparams,
      * descriptors is the pipeline's, and not merely that a multio exists.
      *
      * Only when a pipeline descriptor is actually in play, so that a multio
-     * with nothing to do with the pipe costs nothing; and never for a named
+     * with nothing to do with the pipe costs nothing; and never for a NAMED
      * function definition, which does not perform its redirections but stores
      * them (see the `redir = NULL` further down), so that `f() { ... } > a > b
-     * | cat` defines a function here exactly as zsh does. An anonymous
-     * function does redirect, and does reach this. */
-    if ((input || output) && type != WC_FUNCDEF &&
+     * | cat` defines a function here exactly as zsh does.
+     *
+     * An anonymous function DOES redirect, and telling the two apart is
+     * `*state->pc`, the length of the name list -- the same test the
+     * redirection code further down uses, reading the same unmoved pointer.
+     * Excluding WC_FUNCDEF outright excluded anonymous functions too, and
+     * `() { echo anon } > t1 | cat` wrote the file and sent cat nothing. */
+    if ((input || output) &&
+	(type != WC_FUNCDEF || *state->pc == 0) &&
 	aok_multio_fd(redir, input, output) >= 0)
 	aok_pipeio = (input ? AOK_PIPEIO_IN : 0) |
 		     (output ? AOK_PIPEIO_OUT : 0);
