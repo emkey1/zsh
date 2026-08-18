@@ -28,6 +28,7 @@
  */
 
 #include "zle.mdh"
+#include "aok_fork.h"
 
 /*
  * Keymap structures:
@@ -1227,6 +1228,11 @@ init_keymaps(void)
     default_bindings();
     keybuf = (char *)zshcalloc(keybufsz);
     lastnamed = refthingy(t_undefinedkey);
+    /* AOK: the reference a re-launch is diffed against -- see the block at the
+     * end of this file. Here rather than anywhere later because this is the
+     * last moment at which the keymaps are the DEFAULTS and nothing else, and
+     * the child reaches the same moment by the same route. */
+    aok_snapshot_keymaps();
 }
 
 /* cleanup entry point (for unloading the zle module) */
@@ -1235,6 +1241,7 @@ init_keymaps(void)
 void
 cleanup_keymaps(void)
 {
+    aok_forget_keymaps();
     unrefthingy(lastnamed);
     deletehashtable(keymapnamtab);
     zfree(keybuf, keybufsz);
@@ -1819,4 +1826,318 @@ readcommand(UNUSED(char **args))
 
     setsparam("REPLY", ztrdup(thingy->nam));
     return 0;
+}
+
+/*
+ * ------------------------------------------------------- AOK: keymaps cross
+ *
+ * `bindkey` state did not survive a re-launch. Widgets did (the state script
+ * emits `zle -lL`) but the KEYMAPS did not, so a key the parent had rebound
+ * read as its default in every subshell -- `bindkey '^X^T'` answered
+ * `undefined-key` where zsh 5.9 answers the widget -- a `bindkey -N` map did
+ * not exist at all, and `bindkey -l` was short by every name the parent added.
+ *
+ * WHY A DIFF AND NOT A REPLAY. Replaying is one line of shell: `bindkey -lL`
+ * and a `bindkey -M $m -L` per keymap. It is also 400 lines and 14 KB, on
+ * EVERY subshell of any shell that has loaded zle, to say almost nothing: the
+ * emacs and main keymaps alone are 117 lines each of pure default. So the
+ * parent snapshots the keymaps at the moment zle creates them and emits only
+ * what has changed since -- which for the overwhelmingly common case (a
+ * handful of `bindkey` lines in a .zshrc) is a handful of lines, and for a
+ * shell that has bound nothing is no bytes at all.
+ *
+ * The snapshot is taken in init_keymaps, so the CHILD takes the same one at
+ * the same point -- its zle is created by the state's own `zmodload` line --
+ * and the two are comparable by construction. What the child starts with is
+ * therefore exactly what the parent started with, and the difference between
+ * them is exactly what this emits.
+ *
+ * A rebind and a `bindkey -r` are both differences and both are emitted: a
+ * removed binding comes out as an explicit `undefined-key`, because a state
+ * that only ever ADDS could not express a key the parent had switched off.
+ */
+
+struct aok_kmbind {
+    char *map;			/* the keymap's primary name */
+    char *seq;			/* metafied key sequence */
+    char *bind;			/* widget name, or NULL for a send-string */
+    char *str;			/* the send-string, or NULL */
+    int seen;			/* matched by the live scan */
+};
+
+struct aok_kmname {
+    char *nam;
+    char *primary;		/* the keymap's primary name, or NULL */
+    int seen;
+};
+
+static __thread struct aok_kmbind *aok_kmb;
+static __thread int aok_nkmb, aok_kmbcap;
+static __thread struct aok_kmname *aok_kmn;
+static __thread int aok_nkmn, aok_kmncap;
+/* Only meaningful between init_keymaps and cleanup_keymaps: keymapnamtab is
+ * not cleared when zle is unloaded, so it is not the thing to test. */
+static __thread int aok_km_ready;
+
+/* Collection state, because scankeymap's callback takes one void *. */
+static __thread char *aok_km_curmap;
+static __thread FILE *aok_km_out;
+
+static void aok_kmb_add(char *map, char *seq, Thingy bind, char *str)
+{
+    struct aok_kmbind *e;
+
+    if (aok_nkmb == aok_kmbcap) {
+	int ncap = aok_kmbcap ? aok_kmbcap * 2 : 512;
+	struct aok_kmbind *nv = (struct aok_kmbind *)
+	    zrealloc(aok_kmb, ncap * sizeof(*nv));
+	if (!nv)
+	    return;
+	aok_kmb = nv;
+	aok_kmbcap = ncap;
+    }
+    e = aok_kmb + aok_nkmb++;
+    e->map = ztrdup(map);
+    e->seq = ztrdup(seq);
+    e->bind = bind ? ztrdup(bind->nam) : NULL;
+    e->str = str ? ztrdup(str) : NULL;
+    e->seen = 0;
+}
+
+static void aok_km_snap_key(char *seq, Thingy bind, char *str,
+			    UNUSED(void *magic))
+{
+    aok_kmb_add(aok_km_curmap, seq, bind, str);
+}
+
+/* The primary name of the keymap a name refers to, in scanlistmaps' sense:
+ * NULL when this name IS the keymap's own name rather than an alias of it. */
+static char *aok_km_primary(KeymapName n)
+{
+    Keymap km = n->keymap;
+
+    return (km->primary && km->primary != n) ? km->primary->nam : NULL;
+}
+
+/* True for the names whose bindings are scanned: an alias contributes nothing
+ * of its own, and `.safe` cannot be recreated by a bindkey command anyway. */
+static int aok_km_scannable(KeymapName n)
+{
+    return !aok_km_primary(n) && strcmp(n->nam, ".safe") != 0;
+}
+
+static void aok_km_snap_name(HashNode hn, UNUSED(int flags))
+{
+    KeymapName n = (KeymapName) hn;
+    char *prim = aok_km_primary(n);
+
+    if (aok_nkmn == aok_kmncap) {
+	int ncap = aok_kmncap ? aok_kmncap * 2 : 16;
+	struct aok_kmname *nv = (struct aok_kmname *)
+	    zrealloc(aok_kmn, ncap * sizeof(*nv));
+	if (!nv)
+	    return;
+	aok_kmn = nv;
+	aok_kmncap = ncap;
+    }
+    aok_kmn[aok_nkmn].nam = ztrdup(n->nam);
+    aok_kmn[aok_nkmn].primary = prim ? ztrdup(prim) : NULL;
+    aok_kmn[aok_nkmn].seen = 0;
+    aok_nkmn++;
+
+    if (aok_km_scannable(n)) {
+	aok_km_curmap = n->nam;
+	scankeymap(n->keymap, 1, aok_km_snap_key, NULL);
+    }
+}
+
+void aok_snapshot_keymaps(void)
+{
+    aok_nkmb = aok_nkmn = 0;
+    scanhashtable(keymapnamtab, 1, 0, 0, aok_km_snap_name, 0);
+    aok_km_ready = 1;
+}
+
+void aok_forget_keymaps(void)
+{
+    int i;
+
+    for (i = 0; i < aok_nkmb; i++) {
+	zsfree(aok_kmb[i].map);
+	zsfree(aok_kmb[i].seq);
+	zsfree(aok_kmb[i].bind);
+	zsfree(aok_kmb[i].str);
+    }
+    for (i = 0; i < aok_nkmn; i++) {
+	zsfree(aok_kmn[i].nam);
+	zsfree(aok_kmn[i].primary);
+    }
+    aok_nkmb = aok_nkmn = 0;
+    aok_km_ready = 0;
+}
+
+/* The snapshot and the live scan walk each keymap in the same sorted order, so
+ * the answer is almost always the entry after the last one found. Starting
+ * there rather than at 0 is the difference between one comparison per key and
+ * 400 of them -- with the emacs and main keymaps alone that is ~90k strcmp
+ * pairs on every subshell of an interactive shell, to discover that nothing
+ * has changed. */
+static __thread int aok_km_hint;
+
+static struct aok_kmbind *aok_km_find(char *map, char *seq)
+{
+    int n, i = aok_km_hint;
+
+    for (n = 0; n < aok_nkmb; n++) {
+	if (i >= aok_nkmb)
+	    i = 0;
+	if (!strcmp(aok_kmb[i].map, map) && !strcmp(aok_kmb[i].seq, seq)) {
+	    aok_km_hint = i + 1;
+	    return aok_kmb + i;
+	}
+	i++;
+    }
+    return NULL;
+}
+
+/* One `bindkey` line. WIDGET NULL means "unbind", which is spelled by binding
+ * to undefined-key -- there is no `bindkey -r` form that a keymap-qualified
+ * line can use without a second flag, and rebinding says the same thing. */
+static void aok_km_line(FILE *out, char *map, char *seq,
+			char *widget, char *str)
+{
+    fputs("builtin bindkey -M ", out);
+    quotedzputs(map, out);
+    if (str)
+	fputs(" -s", out);
+    fputc(' ', out);
+    if (seq[0] == '-')
+	fputs("-- ", out);
+    printbind(seq, out);
+    fputc(' ', out);
+    if (str)
+	printbind(str, out);
+    else
+	quotedzputs(widget ? widget : "undefined-key", out);
+    fputc('\n', out);
+}
+
+static void aok_km_emit_key(char *seq, Thingy bind, char *str,
+			    UNUSED(void *magic))
+{
+    struct aok_kmbind *old = aok_km_find(aok_km_curmap, seq);
+
+    if (old) {
+	old->seen = 1;
+	if (bind && old->bind && !strcmp(bind->nam, old->bind))
+	    return;
+	if (!bind && !old->bind && old->str && str && !strcmp(str, old->str))
+	    return;
+    }
+    aok_km_line(aok_km_out, aok_km_curmap, seq,
+		bind ? bind->nam : NULL, str);
+}
+
+/* Emit the keymap difference. Returns without writing anything -- not even
+ * opening the descriptor -- for a shell that never loaded zle, which is every
+ * shell running a script. */
+int aok_have_keymaps(void)
+{
+    return aok_km_ready;
+}
+
+void aok_emit_keymaps(FILE *out)
+{
+    int i;
+
+    if (!aok_km_ready)
+	return;
+    aok_km_out = out;
+    aok_km_hint = 0;
+
+    /* Names first: a binding cannot name a keymap that does not exist yet.
+     *
+     * In two passes over the table, and that is not tidiness. A keymap's own
+     * name has to be written before any ALIAS of it, or `bindkey -A copymap
+     * altname` names a keymap that does not exist yet and the line fails --
+     * and the table is a hash, so one pass hands them over in whatever order
+     * the hash gives. Pass 0 writes the `-N`, pass 1 the `-A`. */
+    {
+	HashNode hn;
+	int j, pass;
+
+	for (pass = 0; pass < 2; pass++) {
+	    for (j = 0; j < keymapnamtab->hsize; j++) {
+		for (hn = keymapnamtab->nodes[j]; hn; hn = hn->next) {
+		    KeymapName n = (KeymapName) hn;
+		    char *prim = aok_km_primary(n);
+		    int known = 0;
+
+		    if (!prim != !pass)
+			continue;
+		    for (i = 0; i < aok_nkmn; i++) {
+			if (strcmp(aok_kmn[i].nam, n->nam))
+			    continue;
+			aok_kmn[i].seen = 1;
+			known = (!prim == !aok_kmn[i].primary) &&
+			    (!prim || !strcmp(prim, aok_kmn[i].primary));
+			break;
+		    }
+		    if (known || !strcmp(n->nam, ".safe"))
+			continue;
+		    fputs(prim ? "builtin bindkey -A " : "builtin bindkey -N ",
+			  out);
+		    if (prim) {
+			if (prim[0] == '-')
+			    fputs("-- ", out);
+			quotedzputs(prim, out);
+			fputc(' ', out);
+		    } else if (n->nam[0] == '-')
+			fputs("-- ", out);
+		    quotedzputs(n->nam, out);
+		    fputc('\n', out);
+		}
+	    }
+	}
+    }
+
+    /* A name the parent DELETED. Last of the name work so that a keymap which
+     * was renamed rather than dropped has its new name already. */
+    for (i = 0; i < aok_nkmn; i++) {
+	if (aok_kmn[i].seen || !strcmp(aok_kmn[i].nam, ".safe"))
+	    continue;
+	fputs("builtin bindkey -D ", out);
+	if (aok_kmn[i].nam[0] == '-')
+	    fputs("-- ", out);
+	quotedzputs(aok_kmn[i].nam, out);
+	fputc('\n', out);
+    }
+
+    /* Then the bindings of every keymap that has a name of its own. */
+    {
+	HashNode hn;
+	int j;
+
+	for (j = 0; j < keymapnamtab->hsize; j++) {
+	    for (hn = keymapnamtab->nodes[j]; hn; hn = hn->next) {
+		KeymapName n = (KeymapName) hn;
+
+		if (!aok_km_scannable(n))
+		    continue;
+		aok_km_curmap = n->nam;
+		scankeymap(n->keymap, 1, aok_km_emit_key, NULL);
+	    }
+	}
+    }
+
+    /* And the bindings the parent removed: in the snapshot, not in the live
+     * keymap, and not simply rebound (a rebind has already been written). */
+    for (i = 0; i < aok_nkmb; i++) {
+	if (aok_kmb[i].seen)
+	    continue;
+	aok_km_line(out, aok_kmb[i].map, aok_kmb[i].seq, NULL, NULL);
+    }
+    for (i = 0; i < aok_nkmb; i++)
+	aok_kmb[i].seen = 0;
+    aok_km_out = NULL;
 }

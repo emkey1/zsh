@@ -1007,7 +1007,8 @@ static __thread int aok_sourcing_state = 0;
 static const char *const aok_script_words[] = {
     "emulate", "setopt", "local", "typeset", "zmodload", "print",
     "functions", "alias", "zstyle", "hash", "continue", "return", "zle",
-    "builtin", "unsetopt", "unset", "trap", "autoload", "disable", NULL
+    "builtin", "unsetopt", "unset", "trap", "autoload", "disable", "bindkey",
+    NULL
 };
 
 static __thread GetNodeFunc aok_real_shfunc_getnode;
@@ -1079,6 +1080,28 @@ static void aok_state_armour_on(int *onoaliases)
     aok_ndisabled = 0;
     scanhashtable(builtintab, 0, 0, 0, aok_undisable_node, 0);
     scanhashtable(reswdtab, 0, 0, 0, aok_undisable_node, 0);
+    /* And the three tables whose entries have a DEFINITION as well as a bit.
+     *
+     * A builtin or a reserved word is compiled into the child, so `disable`
+     * alone recreates it there; an alias, a suffix alias and a function are
+     * not, and every printer that could have emitted them -- `alias -L`,
+     * `alias -sL`, and the `${(@k)functions}` loop by way of zsh/parameter --
+     * skips a DISABLED node by design (parameter.c tests the bit in every
+     * scanner). So the state used to emit `builtin disable -a -- hi` for an
+     * alias whose definition it had never emitted, and that line then FAILED
+     * in the child: `no such hash table element`. A `disable` the parent could
+     * undo with one `enable` was, in every subshell, an object that no longer
+     * existed.
+     *
+     * Un-disabling them here is the same trick already used for the two tables
+     * above, and it is safe for the same reason: it lasts only while the state
+     * is being written, the words the state itself runs are hidden by
+     * aok_shfunc_getnode, and aliases are off entirely for the duration
+     * (noaliases below). The bits are put back by aok_emit_disabled, which is
+     * the last thing in the state for exactly this reason. */
+    scanhashtable(aliastab, 0, 0, 0, aok_undisable_node, 0);
+    scanhashtable(sufaliastab, 0, 0, 0, aok_undisable_node, 0);
+    scanhashtable(shfunctab, 0, 0, 0, aok_undisable_node, 0);
     if (shfunctab->getnode != aok_shfunc_getnode) {
 	aok_real_shfunc_getnode = shfunctab->getnode;
 	shfunctab->getnode = aok_shfunc_getnode;
@@ -1376,9 +1399,77 @@ static void aok_emit_exit_trap(int fd)
     if (!(out = fdopen(dup(fd), "w")))
 	return;
     /* Defining a function whose name is TRAP<SIG> installs the trap; exec.c
-     * does the settrap() itself, so there is nothing else to say. */
+     * does the settrap() itself, so there is nothing else to say. The child
+     * DISARMS it again when its site is not one of the four that fire it --
+     * see aok_child_bits and aok_disarm_exit_trap. */
     aok_emit_funcdef(out, shf);
     fclose(out);
+}
+
+/* WHICH CHILDREN FIRE THE EXIT TRAP, AND WHY THIS IS NOT "ALL OF THEM".
+ *
+ * A re-launched child is a main shell, so it leaves through zexit(), and
+ * zexit() fires the EXIT trap. A FORKED child mostly does not: `( )`, a
+ * pipeline element and a background job leave through _realexit(), which is
+ * bare _exit() with none of zexit's work. Only the substitution sites run
+ * their body with execode(prog, 0, 1, ...) -- `exiting` -- and execlist fires
+ * SIGEXIT for that. So a TRAPEXIT inherited by a re-launched child fired at
+ * EVERY fork site, one firing per subshell more than zsh, measured against
+ * zsh 5.9:
+ *
+ *     TRAPEXIT() { print -ru2 X }
+ *     x=$(print a)          zsh: X   here: X
+ *     ( print b )           zsh: -   here: X
+ *     { print c } | cat     zsh: -   here: X
+ *     { print d } &         zsh: -   here: X
+ *     cat <(print e)        zsh: X   here: X
+ *
+ * The FUNCTION still has to cross, and that is what makes this a bit rather
+ * than a suppressed emission. In a real subshell TRAPEXIT is still there --
+ * `( functions -- TRAPEXIT )` prints its body -- it is only the trap that is
+ * gone, which zsh shows by `( unfunction TRAPEXIT )` answering "no such hash
+ * table element": removetrap() returns nothing when sigtrapped[SIGEXIT] is
+ * clear, so the node survives its own removal. A child handed no definition at
+ * all would answer that question differently and would also lose the trap for
+ * its OWN substitution children, which real zsh keeps:
+ *
+ *     ( print ${+functions[TRAPEXIT]} )     zsh: 1
+ *
+ * Hence: always emit the definition, and tell the child whether to keep the
+ * arming. The condition travels DOWN the whole subtree because a parent whose
+ * own TRAPEXIT is already inert emits it as an ordinary function (the state
+ * script's `${(@k)functions}` loop can see it once sigtrapped[SIGEXIT] is
+ * clear, where an armed one is hidden from that loop) and marks its children
+ * inert whatever site they are -- so `( x=$(...) )` fires nothing at either
+ * level, as zsh does. */
+static int aok_child_bits(int flags)
+{
+    int bits = (flags & AOK_SUB_INCMD) ? AOK_CHILD_INCMD : 0;
+    Shfunc shf = (Shfunc) shfunctab->getnode2(shfunctab, "TRAPEXIT");
+
+    if (shf && !(shf->node.flags & PM_UNDEFINED) &&
+	(!(sigtrapped[SIGEXIT] & ZSIG_FUNC) || !(flags & AOK_SUB_EXITTRAP)))
+	bits |= AOK_CHILD_EXIT_INERT;
+    return bits;
+}
+
+/* The child's half: leave TRAPEXIT in shfunctab, take the trap off it.
+ *
+ * Written out rather than done with unsettrap(), which would take the function
+ * with it -- that is the whole distinction being reproduced. What is left is
+ * exactly the state zsh's own subshell is in, and it is self-consistent:
+ * gettrapnode finds nothing to fire, removetrap finds nothing to remove, and
+ * the next `TRAPEXIT() { ... }` in this shell arms it again from scratch.
+ * exit_trap_posix is signals.c's business and is already 0 here: the child
+ * defines TRAPEXIT while its options are still the `zsh -f` defaults, which is
+ * before the state's option block can turn POSIXTRAPS on. */
+static void aok_disarm_exit_trap(void)
+{
+    if (!(sigtrapped[SIGEXIT] & ZSIG_FUNC))
+	return;
+    if (sigtrapped[SIGEXIT] & ZSIG_TRAPPED)
+	nsigtrapped--;
+    sigtrapped[SIGEXIT] = 0;
 }
 
 /* Per-function STICKY emulation.
@@ -1911,12 +2002,46 @@ static void aok_emit_disabled_table(FILE *out, HashTable ht, const char *opt)
 	fputc('\n', out);
 }
 
+/* `disable -p`, which switches off a PATTERN CHARACTER rather than a table
+ * entry, and so has no node anywhere for aok_emit_disabled_table to find. Its
+ * state is pattern.c's zpc_disables[], one byte per character, and the strings
+ * that name those characters are zpc_strings[] beside it -- which is exactly
+ * the argument form `disable -p` takes, so the line writes itself.
+ *
+ * It belongs here rather than with the options because it changes what a
+ * PATTERN means, not what an option means: with `disable -p '*'` the parent
+ * answers `print /etc/hos*` with the literal word and every subshell answered
+ * it with the expansion, silently. And it belongs at the END of the state for
+ * the same reason the rest of this block does -- the state's own lines are
+ * full of patterns, and turning `*` off halfway through would change what they
+ * matched. A function body that arrives earlier still compiles its patterns
+ * after this, because a pattern is compiled at first USE and the child runs
+ * nothing until the whole state is in. */
+static void aok_emit_disabled_patchars(FILE *out)
+{
+    int i, first = 1;
+
+    for (i = 0; i < ZPC_COUNT; i++) {
+	if (!zpc_strings[i] || !zpc_disables[i])
+	    continue;
+	if (first) {
+	    fputs("builtin disable -p --", out);
+	    first = 0;
+	}
+	fputc(' ', out);
+	aok_emit_quoted(out, zpc_strings[i]);
+    }
+    if (!first)
+	fputc('\n', out);
+}
+
 static void aok_emit_disabled(int fd)
 {
     FILE *out = fdopen(dup(fd), "w");
 
     if (!out)
 	return;
+    aok_emit_disabled_patchars(out);
     aok_emit_disabled_table(out, shfunctab, "-f ");
     aok_emit_disabled_table(out, reswdtab, "-r ");
     aok_emit_disabled_table(out, aliastab, "-a ");
@@ -1927,6 +2052,21 @@ static void aok_emit_disabled(int fd)
 
 /* The tail of the state: the options that had to wait, the alias switch turned
  * back on, and the sentinel. */
+/* The keymap difference, from zle_keymap.c. AFTER the state script, because
+ * every binding names a widget and the script's `zle -lL` is what defines the
+ * parent's widgets; and only worth a descriptor when zle exists at all. */
+static void aok_emit_keymap_state(int fd)
+{
+    FILE *out;
+
+    if (!aok_have_keymaps())
+	return;
+    if (!(out = fdopen(dup(fd), "w")))
+	return;
+    aok_emit_keymaps(out);
+    fclose(out);
+}
+
 static void aok_emit_epilogue(int fd)
 {
     FILE *out;
@@ -2091,16 +2231,30 @@ static char *aok_inherit_string(zlong subshell, int flags)
      * missing one would have it freeing a borrowed environ string. */
     if (!s)
 	return ztrdup(AOK_VAR_INHERIT "=");
-    /* The fourth field is AOK_SUB_INCMD, which is not state a fork copies but
-     * travels here anyway: it rides the validation this variable already has,
-     * and inventing a sixth AOK_ZSH_* variable to carry one bit would mean a
-     * second thing for the child to check and a second thing to strip out of
-     * the environment of every program it runs. */
-    len = (size_t) snprintf(s, cap, "%s=%lld/%lld/%lld/%d/%lld,%lld/%u,%lld/",
+    /* The fourth field is a small bag of BITS about the child rather than
+     * state a fork copies. They travel here because they ride the validation
+     * this variable already has, and inventing another AOK_ZSH_* variable per
+     * bit would mean another thing for the child to check and another thing to
+     * strip out of the environment of every program it runs.
+     *
+     *   AOK_CHILD_INCMD       AOK_SUB_INCMD, see execlist's aok_incmd
+     *   AOK_CHILD_EXIT_INERT  the child's TRAPEXIT must be DEFINED but not
+     *                         ARMED -- see aok_emit_exit_trap
+     *
+     * The comma half of the same field is `optcind`, which is state a fork DOES
+     * copy: it is how far getopts has read into a CLUSTERED option word, so
+     * `set -- -ab; getopts ab o; print $(getopts ab o2; print $o2)` answers b
+     * on zsh 5.9 and answered a here -- the child restarted the cluster and
+     * handed back an option the parent had already consumed. It travels here
+     * rather than with OPTIND because, unlike OPTIND, there is no parameter to
+     * write it into: it is a bare int in builtin.c. Read now rather than with
+     * the rest of the specials because doshfunc zeroes it on entry to a
+     * function and the state script is one. */
+    len = (size_t) snprintf(s, cap, "%s=%lld/%lld/%lld/%d,%d/%lld,%lld/%u,%lld/",
 			    AOK_VAR_INHERIT,
 			    (long long) lastpid, (long long) ppid,
 			    (long long) subshell,
-			    (flags & AOK_SUB_INCMD) ? 1 : 0,
+			    aok_child_bits(flags), optcind,
 			    (long long) shtimer.tv_sec,
 			    (long long) shtimer.tv_nsec,
 			    aok_random_seed, (long long) aok_random_draws);
@@ -2273,6 +2427,7 @@ static void aok_write_state(int fd, int flags)
 	aok_emit_prologue(fd);
 	aok_run_state_script(fd);
 	aok_emit_tables(fd);
+	aok_emit_keymap_state(fd);
 	aok_emit_exit_trap(fd);
 	aok_emit_floats(fd);
 	aok_emit_specials(fd);
@@ -2293,6 +2448,7 @@ static void aok_write_state(int fd, int flags)
 	aok_emit_prologue(2);
 	aok_run_state_script(2);
 	aok_emit_tables(2);
+	aok_emit_keymap_state(2);
 	aok_emit_exit_trap(2);
 	aok_emit_floats(2);
 	aok_emit_specials(2);
@@ -2596,10 +2752,21 @@ done:
  * aok_child_init -- see the comment where it is parsed. */
 static __thread char *aok_inherit_underscore;
 
+/* AOK_CHILD_EXIT_INERT, held between aok_adopt_inherit (which runs before the
+ * state) and the bottom of aok_child_init (which is after it, because the
+ * state is what defines TRAPEXIT in the first place). */
+static __thread int aok_exit_inert;
+
+/* getopts' position within a clustered option word, held for the same reason
+ * and installed in the same place: the state script is an anonymous function,
+ * and doshfunc zeroes optcind on the way in and restores its own saved copy on
+ * the way out. */
+static __thread int aok_inherit_optcind;
+
 static char *aok_adopt_inherit(int validated)
 {
     char *raw, *value, *end, *pipes = NULL;
-    long long bang, parent, subshell, incmd, shsec, shnsec, rdraws;
+    long long bang, parent, subshell, cbits, coptcind, shsec, shnsec, rdraws;
     unsigned long long rseed;
 
     raw = getsparam(AOK_VAR_INHERIT);
@@ -2626,10 +2793,15 @@ static char *aok_adopt_inherit(int validated)
 	goto done;
     raw = end + 1;
     errno = 0;
-    incmd = strtoll(raw, &end, 10);
+    cbits = strtoll(raw, &end, 10);
+    if (end == raw || *end != ',' || errno != 0)
+	goto done;
+    raw = end + 1;
+    errno = 0;
+    coptcind = strtoll(raw, &end, 10);
     if (end == raw || *end != '/' || errno != 0)
 	goto done;
-    if (bang < 0 || parent < 0 || subshell < 0 || incmd < 0)
+    if (bang < 0 || parent < 0 || subshell < 0 || cbits < 0 || coptcind < 0)
 	goto done;
 
     /* shtimer, as the two halves of the timespec. Installed rather than
@@ -2661,7 +2833,9 @@ static char *aok_adopt_inherit(int validated)
     lastpid = (zlong) bang;
     ppid = (zlong) parent;
     zsh_subshell = (zlong) subshell;
-    aok_relaunch_incmd = incmd != 0;
+    aok_relaunch_incmd = (cbits & AOK_CHILD_INCMD) != 0;
+    aok_exit_inert = (cbits & AOK_CHILD_EXIT_INERT) != 0;
+    aok_inherit_optcind = (int) coptcind;
     shtimer.tv_sec = (time_t) shsec;
     shtimer.tv_nsec = (long) shnsec;
     /* Rebuild libc's generator by replaying the parent's draws. Exact, because
@@ -2897,6 +3071,13 @@ void aok_child_init(void)
 	if (n > 0)
 	    write(2, msg, (size_t) n);
     }
+    /* Before aok_inherited_ntraps is taken, because a trap this shell will
+     * never fire must not be counted as one of the traps it was handed -- that
+     * count is what decides whether the command it was launched to run has to
+     * fork at all. */
+    if (aok_exit_inert)
+	aok_disarm_exit_trap();
+    optcind = aok_inherit_optcind;
     aok_inherited_ntraps = nsigtrapped;
     aok_relaunch_incmd = incmd;
 

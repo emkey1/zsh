@@ -20,6 +20,17 @@
  * process-substitution sites hand over a list whose child really does run
  * execlist. See the aok_incmd comment in execlist. */
 #define AOK_SUB_INCMD    0x04
+/* This site's child is one whose execlist runs with `exiting` set, so it fires
+ * its EXIT trap on the way out -- upstream's execode(prog, 0, 1, "cmdsubst")
+ * and its three siblings. Only the command- and process-substitution sites are
+ * like that; `( )`, a pipeline element and a background job hand their child a
+ * DEAD exit trap instead. See aok_emit_exit_trap. */
+#define AOK_SUB_EXITTRAP 0x08
+
+/* The bits of AOK_ZSH_INHERIT's fourth field: facts about the CHILD, decided
+ * by the site that spawns it, rather than state a fork would have copied. */
+#define AOK_CHILD_INCMD      0x01	/* AOK_SUB_INCMD, as the child sees it */
+#define AOK_CHILD_EXIT_INERT 0x02	/* define TRAPEXIT, do not arm it */
 
 #define AOK_MAX_CLOSE 32
 
@@ -73,11 +84,40 @@ extern __thread int aok_inherited_ntraps;
  * the first sublist execlist runs afterwards. */
 extern __thread int aok_relaunch_incmd;
 
+/* AOK: the REDIRECTIONS of a command, as source text, on the heap.
+ *
+ * Lives in text.c beside getredirs(), whose buffer machinery it borrows, but
+ * deliberately without zsh's `/**\/` marker so that makepro.awk's text.epro
+ * stays exactly what upstream would generate. It exists so that the re-launch
+ * of an external command can hand its child the EXPANDED words plus the
+ * command's own redirections, instead of falling back to source text and
+ * running every expansion a second time. See the second execcmd_fork site.
+ *
+ * Returns NULL if any redirection in the list is one getredirs() cannot render
+ * on its own -- a here-document, whose body is emitted later by gettext2, or a
+ * process substitution, whose name is not the text it was written as. */
+char *aok_redir_text(LinkList redirs);
+
+/* AOK: the assignment prefix of a command (`VAR=x cmd`), as source text, on
+ * the heap; NULL when there is none. aok_redir_text's twin -- see the note in
+ * text.c -- and used by the same call site for the same reason. */
+char *aok_assign_text(Wordcode varspc, Eprog prog);
+
 /* The $RANDOM stream, as a seed and a draw count, so that a re-launched child
  * can rebuild libc's generator state -- which a real fork copies and this one
  * cannot see. Maintained by init.c (the startup seed) and by randomsetfn and
  * randomgetfn in params.c; replayed by aok_child_init. See aok_fork.c. */
 extern __thread unsigned int aok_random_seed;
 extern __thread zlong aok_random_draws;
+
+/* AOK: the keymap difference, from Src/Zle/zle_keymap.c. Deliberately without
+ * zsh's `/**\/` marker so that makepro.awk's zle_keymap.pro stays exactly what
+ * upstream would generate -- the same arrangement text.c uses for
+ * aok_redir_text. aok_emit_keymaps writes nothing at all when zle was never
+ * loaded, which is every shell running a script. */
+int aok_have_keymaps(void);
+void aok_snapshot_keymaps(void);
+void aok_forget_keymaps(void);
+void aok_emit_keymaps(FILE *out);
 
 #endif /* AOK_FORK_H */

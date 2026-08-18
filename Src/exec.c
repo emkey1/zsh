@@ -305,9 +305,63 @@ static __thread int zsh_eval_context_alen;
 #define AOK_PIPEIO_IN  1
 #define AOK_PIPEIO_OUT 2
 
-/* Latched by execlist for the launched command, spent by its first
- * execcmd_exec. */
+/* Latched by execlist for the launched command, claimed by the first
+ * execcmd_exec ENTERED for it. See aok_pipeio_claim. */
 static __thread int aok_pipeio_pending;
+
+/* AOK: hand the pending bits to the execcmd_exec that is ENTERED first, not to
+ * the one that REACHES the descriptors first. The two are not the same frame,
+ * and telling them apart is the whole of this function.
+ *
+ * The bits are applied late in execcmd_exec, immediately before addfd, for the
+ * reason the note above gives: a non-zero `output` is one of the things that
+ * makes execcmd_exec decide to fork, so the child would re-launch itself
+ * forever if they were applied at the top. But "late in execcmd_exec" is on
+ * the far side of ARGUMENT EXPANSION, and expansion runs commands:
+ *
+ *     echo $(...) > f | cat        `...` is a re-launch
+ *     echo `...`  > f | cat        the same
+ *     cat <(...)  > f | cat        so is a process substitution
+ *     cat =(...)  > f | cat        and so is this one
+ *
+ * A re-launch serialises this shell's state first, and the serialiser is a
+ * zsh function this shell RUNS (aok_run_state_script) -- so its own
+ * execcmd_exec reached the pending flag while the outer command was still
+ * expanding its arguments, took the bits, and dup'd fd 1, which at that moment
+ * was the state pipe. The outer command then built no multio, the file
+ * replaced the pipe, and the downstream command received nothing: exactly the
+ * failure AOK_VAR_PIPEIO exists to prevent, reintroduced by every command that
+ * substitutes anything. `echo hi > f | cat` worked; `echo $(echo hi) > f | cat`
+ * wrote f, exited 0 and printed nothing.
+ *
+ * Claiming at entry fixes the class rather than the four spellings above,
+ * because anything expansion runs is necessarily entered LATER than the
+ * command whose arguments are being expanded -- a glob qualifier's `e:...:`
+ * code and a `functions -M` math function included, neither of which involves
+ * a re-launch at all.
+ *
+ * It also keeps the property the container shapes depend on. `{ echo hi > f }
+ * | cat` sends cat nothing on real zsh, because upstream's forked child adds
+ * the pipe to fd 1 for the GROUP and the inner command's `> f` then replaces
+ * it for itself; here the group's execcmd_exec is the first one entered and so
+ * the one that claims the bits, which produces the same answer. Same for
+ * `( ... ) | cat`, a function body, and a loop. */
+/* Latched beside the descriptor bits and claimed with them: "this is the one
+ * command this shell was re-launched to run". Where the bits above are only
+ * set for a multio, this is set for every re-launched command, because what
+ * reads it is asking a different question -- see aok_relaunch_cmd's use at the
+ * builtin write-error test. */
+static __thread int aok_relaunch_cmd_pending;
+
+static int aok_pipeio_claim(int *relaunch_cmd)
+{
+    int bits = aok_pipeio_pending;
+
+    aok_pipeio_pending = 0;
+    *relaunch_cmd = aok_relaunch_cmd_pending;
+    aok_relaunch_cmd_pending = 0;
+    return bits;
+}
 
 /* Read the variable and take it out of this shell for good: it is imported as
  * an exported parameter like anything else in the environment, so leaving it
@@ -1537,6 +1591,7 @@ execlist(Estate state, int dont_change_job, int exiting)
 	    /* The same sublist, and only it, is the one whose descriptors the
 	     * spawner meant. See AOK_VAR_PIPEIO. */
 	    aok_pipeio_pending = aok_pipeio_inherit();
+	    aok_relaunch_cmd_pending = 1;
 	}
 	this_noerrexit = 0;
 
@@ -3329,6 +3384,10 @@ execcmd_exec(Estate state, Execcmd_params eparams,
     int save[10];
     int fil, dfil, is_cursh = 0, do_exec = 0, redir_err = 0, i;
     int nullexec = 0, magic_assign = 0, forked = 0, old_lastval, aok_pipeio = 0;
+    /* AOK: this frame's claim on the pipeline descriptors, and on being the
+     * command the re-launch was handed. Both taken at entry; see the note
+     * above AOK_VAR_PIPEIO and aok_pipeio_claim below. */
+    int aok_pipeio_mine, aok_relaunch_cmd;
     int is_shfunc = 0, is_builtin = 0, is_exec = 0, use_defpath = 0;
     /* Various flags to the command. */
     int cflags = 0, orig_cflags = 0, checked = 0, oautocont = -1;
@@ -3356,6 +3415,11 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	shelltime(&shti, &chti, &then, 0);
 
     doneps4 = 0;
+
+    /* AOK: claim the pipeline descriptors NOW, and apply them much further
+     * down. Entering is what claims them; reaching the addfd calls is what
+     * spends them. See aok_pipeio_claim. */
+    aok_pipeio_mine = aok_pipeio_claim(&aok_relaunch_cmd);
 
     /*
      * If assignment but no command get the status from variable
@@ -3436,6 +3500,22 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	aok_multio_fd(redir, input, output) >= 0)
 	aok_pipeio = (input ? AOK_PIPEIO_IN : 0) |
 		     (output ? AOK_PIPEIO_OUT : 0);
+
+    /* AOK: and bits this frame claimed but is not going to spend go ON, for
+     * the same reason they were sent here in the first place.
+     *
+     * A re-launched pipeline element can have to re-launch AGAIN -- `cat
+     * =(echo A) > f | cat` is the shape, because a `=(...)` puts a name in the
+     * file list and havefiles() rules out the fake exec. The grandchild is
+     * then the shell that actually runs the command, it inherits fd 1 (which
+     * is still the pipe, since `output` is zero here and nothing dup2s over
+     * it), and without being told it re-parses `> f` as a lone redirection and
+     * the file replaces the pipe -- the original loss, one level further down.
+     * f held A, `cat` received nothing, status 0.
+     *
+     * The claim is spent either way: if this frame re-launches it never
+     * reaches the addfd calls, and if it does not, aok_pipeio is unused. */
+    aok_pipeio |= aok_pipeio_mine;
 
     if ((how & Z_ASYNC) || output ||
 	(last1 == 2 && input && EMULATION(EMULATE_SH))) {
@@ -4140,9 +4220,26 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	     /* AOK: nsigtrapped MINUS the traps this shell was handed. A
 	      * re-launched child is already somebody's fork, and counting the
 	      * traps it inherited made it fork again for the same reason,
-	      * forever. See aok_inherited_ntraps. */
+	      * forever. See aok_inherited_ntraps.
+	      *
+	      * SIGEXIT is exempt from that subtraction, and has to be. It is
+	      * the one trap that is not DELIVERED but FIRED on the way out, so
+	      * it is precisely the reason clause (2) above exists: a shell that
+	      * still owes an EXIT trap cannot hand its process to the command.
+	      * With it subtracted, a substitution child whose last command was
+	      * external exec'd itself away and the trap never ran --
+	      * `TRAPEXIT() { print -ru2 X }; v=$(/bin/echo a)` printed nothing
+	      * where zsh 5.9 prints X, and the same for `cat <(/bin/echo b)`
+	      * and `echo z > >(/bin/cat >/dev/null)`.
+	      *
+	      * This cannot recur the way the subtraction was written to
+	      * prevent, because only the four substitution sites hand a child
+	      * an ARMED exit trap (see aok_child_bits): the fork this forces is
+	      * one of the ordinary ones, its child is marked EXIT_INERT, and
+	      * that child's sigtrapped[SIGEXIT] is therefore 0. */
 	     (!is_cursh && (last1 != 1 ||
 			    nsigtrapped > aok_inherited_ntraps ||
+			    sigtrapped[SIGEXIT] ||
 			    havefiles() || fdtable_flocks)))) {
 	    /* AOK: DOUBLE EVALUATION lives here, and this is the mitigation.
 	     *
@@ -4158,17 +4255,48 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	     * which re-runs nothing. `cmd $(date); more` is that shape and it is
 	     * the common one.
 	     *
-	     * The fallback to source text remains for the rest: `VAR=x cmd $(y)`
-	     * needs its assignments, `cmd $(y) >f` needs its redirection, and a
-	     * `( ... )` subshell in non-tail position is shell code whose body
-	     * has not been expanded at all and so is faithful either way. The
-	     * narrow case still exposed is a side-effecting expansion in a
-	     * command that ALSO carries an assignment or a redirection and is
-	     * not the last thing this shell will do. It is written down here
-	     * rather than left to be discovered. */
+	     * The fallback to source text remains for anything that is not a
+	     * simple command -- a `( ... )` subshell in non-tail position is
+	     * shell code whose body has not been expanded at all and so is
+	     * faithful either way.
+	     *
+	     * REDIRECTIONS AND ASSIGNMENTS USED TO FORCE THAT FALLBACK AND DO
+	     * NOT ANY MORE, because all three parts can be handed over
+	     * together: aok_assign_text renders the `VAR=x` prefix and
+	     * aok_redir_text the redirections -- neither of which this shell
+	     * has performed yet, so both stay source text exactly as the
+	     * fallback left them -- around the words it HAS expanded. Two
+	     * things were wrong while a redirection meant source text for the
+	     * whole command.
+	     *
+	     * `/bin/echo $(cmd) > f` ran `cmd` TWICE -- once in this shell, once
+	     * again in the child re-parsing the source text -- so a substitution
+	     * with a side effect had it twice and a `$RANDOM` or a `$(date +%N)`
+	     * did not even agree with itself.
+	     *
+	     * And `cat =(echo X) > h` did not terminate. A `=(...)` puts a name
+	     * in the file list, havefiles() is one of the tests above, so the
+	     * command cannot fake-exec and must be re-launched -- and a child
+	     * handed the source text re-runs the `=(...)`, puts a name in ITS
+	     * file list, and re-launches again, for as long as descriptors last.
+	     * What ended the regress before was another bug entirely (the
+	     * process substitution silently failing in the child); with that
+	     * fixed the regress was what remained.
+	     *
+	     * A redirection aok_redir_text will not render -- a here-document, a
+	     * process substitution, a `{fd}>` -- returns NULL and keeps the
+	     * source-text fallback, so the narrow case still exposed is a
+	     * side-effecting expansion in a command that ALSO carries one of
+	     * those three and is not the last thing this shell will do. It is
+	     * written down here rather than left to be discovered. */
+	    char *aok_rtext = NULL, *aok_vtext = NULL;
+
 	    if ((type == WC_SIMPLE || type == WC_TYPESET) &&
-		args && nonempty(args) && !varspc &&
-		(!eparams->redir || empty(eparams->redir))) {
+		args && nonempty(args) &&
+		(!varspc ||
+		 (aok_vtext = aok_assign_text(varspc, state->prog)) != NULL) &&
+		(!eparams->redir || empty(eparams->redir) ||
+		 (aok_rtext = aok_redir_text(eparams->redir)) != NULL)) {
 		/* AOK: glob BEFORE quoting, which is the whole of this fix.
 		 *
 		 * The words here are post-prefork but PRE-GLOB -- the parent's
@@ -4195,11 +4323,20 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 		 * that NOMATCH stays the parent's error, reported before the
 		 * spawn, exactly as an unforked shell reports it. */
 		globlist(args, 0);
-		if (!errflag)
+		if (!errflag) {
 		    aoktext = aok_quote_words(args);
+		    if (aok_vtext)
+			aoktext = dyncat(aok_vtext, aoktext);
+		    if (aok_rtext)
+			aoktext = dyncat(aoktext, aok_rtext);
+		}
 	    }
 	    else
 		aoktext = getpermtext(state->prog, eparams->beg, 0);
+	    if (aok_vtext)
+		zsfree(aok_vtext);
+	    if (aok_rtext)
+		zsfree(aok_rtext);
 	    if (!text)
 		text = dupstring(getjobtext(state->prog, eparams->beg));
 	    switch (execcmd_fork(state, how, type, varspc, &filelist,
@@ -4263,15 +4400,17 @@ execcmd_exec(Estate state, Execcmd_params eparams,
      * was handed is on fd 0 or fd 1 rather than in `input`/`output`, and the
      * two addfd calls below are the only reason the distinction matters. See
      * AOK_VAR_PIPEIO for why a dup of the descriptor is the whole answer, and
-     * why this cannot happen any earlier in this function.
+     * why this cannot happen any earlier in this function. The bits were
+     * CLAIMED at the top of this function and are only SPENT here: see
+     * aok_pipeio_claim for why the two moments have to be separate.
      *
      * A scan also used to sit here refusing multios outright, before the loop
      * further down opened -- and so truncated -- their target files. closemn()
      * implements them now, so there is nothing left to refuse. */
-    if (aok_pipeio_pending) {
-	int bits = aok_pipeio_pending, dupfd;
+    if (aok_pipeio_mine) {
+	int bits = aok_pipeio_mine, dupfd;
 
-	aok_pipeio_pending = 0;
+	aok_pipeio_mine = 0;
 	/* movefd, as everything that becomes an mfd is moved: addfd would
 	 * otherwise be handed a descriptor in the 0-9 range it is about to
 	 * shuffle. A dup that fails leaves the element behaving as it did
@@ -4812,7 +4951,31 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 		    errflag &= ~ERRFLAG_ERROR;
 		restore_queue_signals(q);
 		fflush(stdout);
-		if (save[1] == -2) {
+		/* AOK: `save[1] == -2` asks "is this shell going to put fd 1
+		 * back?", and upstream only means that as a stand-in for "am I
+		 * a forked child that is about to exit" -- a child does not
+		 * save its descriptors (see addfd's `!forked` test), so a write
+		 * error there is nobody's to recover from and gets reported,
+		 * while the main shell, which will restore fd 1 and carry on,
+		 * swallows it.
+		 *
+		 * A re-launched pipeline element or background job is that
+		 * child. It is a whole shell rather than a fork, so it DOES
+		 * save fd 1, and the diagnostic upstream prints was being
+		 * thrown away by the else branch:
+		 *
+		 *     % print a > t1 >&- | cat
+		 *     zsh:1: write error: bad file descriptor     zsh 5.9
+		 *                                                 (nothing here)
+		 *
+		 * so `print` wrote nowhere, said nothing and exited 0. The
+		 * question upstream is really asking is asked directly instead.
+		 * It is asked of this FRAME, not of the shell, which is what
+		 * keeps `{ print a > t1 >&- } | cat` silent at both ends: the
+		 * group is the command the re-launch was handed, the `print`
+		 * inside it is not, and upstream's inner execcmd_exec is not a
+		 * fork either and saves fd 1 exactly as this one does. */
+		if (save[1] == -2 || aok_relaunch_cmd) {
 		    if (ferror(stdout)) {
 			zwarn("write error: %e", errno);
 			clearerr(stdout);
@@ -5346,6 +5509,11 @@ getoutput(char *cmd, int qt)
 
 	aok_spawn_init(&sp);
 	sp.out_fd = pipes[1];
+	/* Upstream's child runs execode(prog, 0, 1, "cmdsubst") -- the 1 is
+	 * `exiting`, and it is what makes execlist fire the EXIT trap on the
+	 * way out. A command substitution is one of the four sites that do
+	 * that; see aok_emit_exit_trap for the other side of it. */
+	sp.flags = AOK_SUB_EXITTRAP;
 	/* The read end must not survive into the child. A child holding it
 	 * open is a reader that never goes away, so this shell's readoutput
 	 * would wait for an EOF that cannot arrive. */
@@ -5584,6 +5752,7 @@ getoutputfile(char *cmd, char **eptr)
 
 	aok_spawn_init(&sp);
 	sp.out_fd = fd;
+	sp.flags = AOK_SUB_EXITTRAP;	/* execode(..., 1, "equalsubst") */
 	pid = aok_spawn_subshell(getpermtext(prog, NULL, 0), &sp);
 	if (pid == -1) {
 	    zerr("process substitution failed: %e", errno);
@@ -5697,7 +5866,9 @@ getproc(char *cmd, char **eptr)
 	    sp.out_fd = pipes[out];
 	else
 	    sp.in_fd = pipes[out];
-	sp.flags = AOK_SUB_ASYNC;
+	/* execode(..., 1, out ? "outsubst" : "insubst"): a process
+	 * substitution fires its EXIT trap like a command one. */
+	sp.flags = AOK_SUB_ASYNC | AOK_SUB_EXITTRAP;
 	/* closem() is what the forked child used to do this with, and its
 	 * comment says so: "this closes pipes[!out] as well". The end this
 	 * shell keeps must not stay open in the child, or the reader at the
@@ -5774,7 +5945,9 @@ getpipe(char *cmd, int nullexec)
 	    sp.out_fd = pipes[out];
 	else
 	    sp.in_fd = pipes[out];
-	sp.flags = AOK_SUB_ASYNC;
+	/* execode(..., 1, out ? "outsubst" : "insubst"): a process
+	 * substitution fires its EXIT trap like a command one. */
+	sp.flags = AOK_SUB_ASYNC | AOK_SUB_EXITTRAP;
 	aok_spawn_close(&sp, pipes[!out]);
 	pid = aok_spawn_subshell(getpermtext(prog, NULL, 0), &sp);
     }

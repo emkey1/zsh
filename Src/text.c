@@ -29,6 +29,7 @@
 
 #include "zsh.mdh"
 #include "text.pro"
+#include "aok_fork.h"
 
 /*
  * If non-zero, expand syntactically significant leading tabs in text
@@ -1116,4 +1117,141 @@ getredirs(LinkList redirs)
     tptr--;
 
     unqueue_signals();
+}
+
+/* AOK: the redirections of one command, rendered on their own.
+ *
+ * getpermtext() renders a whole command and getredirs() renders only the tail
+ * of one, but getredirs() writes into the same tbuf/tptr/tlim machinery and
+ * has no way to set it up. This is that setup, lifted from getpermtext(), so
+ * that the re-launch of an external command can be handed the words it has
+ * ALREADY expanded plus the redirections it has not performed yet -- rather
+ * than the whole command as source text, which makes the child re-run every
+ * substitution the parent just ran. `/bin/echo $(cmd) > f` ran `cmd` twice.
+ *
+ * Declared in aok_fork.h rather than through zsh's `/**\/` marker, so that
+ * text.epro stays byte-for-byte what makepro.awk would produce for upstream's
+ * text.c.
+ *
+ * NULL for a list getredirs() cannot render standalone:
+ *
+ *   - a here-document. getredirs() emits `<<TERM` and defers the BODY to
+ *     taddpending(), which only gettext2() flushes -- so the text would name a
+ *     terminator whose document never arrives, and the child would read the
+ *     rest of the script as the here-document.
+ *   - a process substitution in redirection position (`< <(...)`, `> >(...)`).
+ *     Its `name` is the command, not the `<(...)` the user wrote, so the
+ *     rendering does not parse back to what it came from.
+ *   - a `{fd}>` redirection, whose whole point is to assign a parameter in the
+ *     shell that performs it, and the shell that would perform it here is a
+ *     child whose parameters are discarded.
+ *
+ * In every one of those cases the caller keeps the source-text fallback it had
+ * before, which is no worse than it was. */
+
+/* AOK: the ASSIGNMENT PREFIX of one command, rendered on its own -- `VAR=x` in
+ * `VAR=x cmd args`. getredirs()'s twin for the other end of the command, and
+ * here for the same reason: without it a command carrying an assignment had to
+ * be re-launched as source text.
+ *
+ * The values are still source text and the child still expands them, which is
+ * exactly what upstream's fallback did with them, so nothing about the
+ * assignments changes; what changes is that the ARGUMENTS beside them no
+ * longer have to be source text too.
+ *
+ * The walk is the one execcmd_exec's own STTY scan uses -- assignments are a
+ * run of WC_ASSIGN words at `varspc` -- and the rendering is gettext2()'s, one
+ * taddassign() per word, which leaves the separating space after each. */
+
+char *
+aok_assign_text(Wordcode varspc, Eprog prog)
+{
+    struct estate s;
+    wordcode code;
+    char *ret;
+
+    if (!varspc || wc_code(*varspc) != WC_ASSIGN)
+	return NULL;
+
+    queue_signals();
+
+    s.prog = prog;
+    s.pc = varspc;
+    s.strs = prog->strs;
+
+    tindent = 0;
+    tnewlins = 1;
+    tbuf = (char *)zalloc(tsiz = 32);
+    tptr = tbuf;
+    tlim = tbuf + tsiz;
+    tjob = 0;
+    while (wc_code(code = *s.pc) == WC_ASSIGN) {
+	s.pc++;
+	taddassign(code, &s, 0);
+    }
+    *tptr = '\0';
+    untokenize(tbuf);
+    ret = tbuf;
+    tbuf = NULL;
+
+    unqueue_signals();
+
+    return ret;
+}
+
+char *
+aok_redir_text(LinkList redirs)
+{
+    LinkNode n;
+    char *ret;
+
+    if (!redirs || empty(redirs))
+	return NULL;
+    for (n = firstnode(redirs); n; incnode(n)) {
+	Redir f = (Redir) getdata(n);
+
+	if (f->varid)
+	    return NULL;
+	switch (f->type) {
+	case REDIR_WRITE:
+	case REDIR_WRITENOW:
+	case REDIR_APP:
+	case REDIR_APPNOW:
+	case REDIR_ERRWRITE:
+	case REDIR_ERRWRITENOW:
+	case REDIR_ERRAPP:
+	case REDIR_ERRAPPNOW:
+	case REDIR_READ:
+	case REDIR_READWRITE:
+	case REDIR_MERGEIN:
+	case REDIR_MERGEOUT:
+	    break;
+	case REDIR_HERESTR:
+	    /* A `<<<` written as one is renderable; one that started life as a
+	     * here-document is not, for the reason above. */
+	    if (f->flags & REDIRF_FROM_HEREDOC)
+		return NULL;
+	    break;
+	default:
+	    return NULL;
+	}
+    }
+
+    queue_signals();
+
+    tindent = 0;
+    tnewlins = 1;
+    tbuf = (char *)zalloc(tsiz = 32);
+    tptr = tbuf;
+    tlim = tbuf + tsiz;
+    tjob = 0;
+    getredirs(redirs);
+    *tptr = '\0';
+    untokenize(tbuf);
+    ret = tbuf;
+    tbuf = NULL;
+
+    unqueue_signals();
+
+    return ret;
 }

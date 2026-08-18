@@ -2227,47 +2227,85 @@ extern char *_mktemp(char *);
 mod_export char *
 gettempname(const char *prefix, int use_heap)
 {
-    char *ret, *suffix = prefix ? ".XXXXXX" : "XXXXXX";
+    char *ret = NULL;
+    /* AOK: upstream's `prefix ? ".XXXXXX" : "XXXXXX"`, split in two because
+     * the stamp below goes between the dot and the XXXXXX. Recorded before
+     * `prefix` is given its default, which is what the question is about. */
+    int dot = (prefix != NULL);
+    /* Per shell, and unique in the app when paired with the task's pid. */
+    static __thread unsigned aok_seq;
+    int aok_try;
 
     queue_signals();
     if (!prefix && !(prefix = getsparam("TMPPREFIX")))
 	prefix = DEFAULT_TMPPREFIX;
-    if (use_heap)
-	ret = dyncat(unmeta(prefix), suffix);
-    else
-	ret = bicat(unmeta(prefix), suffix);
 
+    /*
+     * AOK: THE RANDOM PART OF A TEMPORARY NAME IS NOT WHAT MAKES IT UNIQUE
+     * HERE, SO DO NOT ASK IT FOR UNIQUENESS.
+     *
+     * mktemp's contract is "a name nothing was using a moment ago", and every
+     * caller leans on it: `=(...)` opens the result O_WRONLY|O_CREAT|O_EXCL,
+     * namedpipe() mknods it, ${name//pat/repl} spills a reply file into it.
+     * The mktemp underneath is the app's own -- nlibc_mktemp in
+     * kernel/native_libc.c -- and it has two properties zsh cannot survive:
+     * it fills the XXXXXX from rand(), which in a re-launched child replays
+     * the sequence the parent just used, so the child asks for and is given
+     * the name its parent is already holding; and its retry after a collision
+     * rewrites a template whose XXXXXX it has itself already overwritten, so
+     * the retry fails its own end-of-template check and the call returns NULL
+     * rather than a different name.
+     *
+     * Both of those are the app's to fix and neither is fixed here. What is
+     * fixed here is zsh depending on either, because the cost of the
+     * dependency was silence: a NULL from this function makes getoutputfile
+     * return NULL, which drops the whole word, with no message and status 0.
+     * Measured, five process substitutions in ONE shell, no fork in sight:
+     *
+     *     % print -rl -- =(echo 1) =(echo 2) =(echo 3) =(echo 4) =(echo 5)
+     *     /tmp/zsh8cy7kc
+     *     /tmp/zsh40gycu
+     *
+     * Three words gone. `cat =(echo X) > h` was the same failure one level
+     * down: a `=(...)` puts an entry in the file list, which rules out the
+     * fake exec, so the command is re-launched and the child's mktemp
+     * reproduces the parent's name -- and there `cat` lost its argument, read
+     * its own stdin instead, and left `h` empty.
+     *
+     * A guest task's pid is unique in the app and a counter is unique within
+     * a task, so `<pid>-<seq>` names THIS call and no other call anywhere,
+     * whatever rand() does. The XXXXXX stays and keeps doing the job it is
+     * actually good for, which is being unpredictable to anything else
+     * writing in the same directory. The loop covers mktemp failing anyway,
+     * and builds a FRESH template every time round, because a template that
+     * came back unusable has been scribbled on and cannot be offered again.
+     */
+    for (aok_try = 0; aok_try < 8; aok_try++) {
+	char tail[48];
+	char *cand, *named;
+
+	sprintf(tail, "%s%x-%xXXXXXX", dot ? "." : "",
+		(unsigned) getpid(), aok_seq++);
+	if (use_heap)
+	    cand = dyncat(unmeta(prefix), tail);
+	else
+	    cand = bicat(unmeta(prefix), tail);
 #ifdef HAVE__MKTEMP
-    /* Zsh uses mktemp() safely, so silence the warnings */
-    ret = (char *) _mktemp(ret);
-#elif HAVE_MKSTEMP && defined(DEBUG)
-    {
-	/* zsh uses mktemp() safely (all callers use O_EXCL, and one of them
-	 * uses mkfifo()/mknod(), as opposed to open()), but some compilers
-	 * warn about this anyway and give no way to disable the warning. To
-	 * appease them, use mkstemp() and then close the fd and unlink the
-	 * filename, to match callers' expectations.
-	 *
-	 * But do this in debug builds only, because we don't want to suffer
-	 * x3 the disk access (touch, unlink, touch again) in production.
-	 */
-	int fd;
-	errno = 0;
-	fd = mkstemp(ret);
-	if (fd < 0)
-	    zwarn("can't get a temporary filename: %e", errno);
-	else {
-	    close(fd);
-	    ret = ztrdup(ret);
-
-	    errno = 0;
-	    if (unlink(ret) < 0)
-		zwarn("unlinking a temporary filename failed: %e", errno);
-	}
-    }
+	/* Zsh uses mktemp() safely, so silence the warnings */
+	named = (char *) _mktemp(cand);
 #else
-    ret = (char *) mktemp(ret);
+	named = (char *) mktemp(cand);
 #endif
+	if (named && *named) {
+	    ret = named;
+	    break;
+	}
+	/* mktemp may have returned NULL without freeing anything, so the
+	 * candidate is released through the pointer we still hold. */
+	if (!use_heap)
+	    free(cand);
+    }
+
     unqueue_signals();
 
     return ret;
