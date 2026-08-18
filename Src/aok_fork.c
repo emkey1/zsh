@@ -751,21 +751,87 @@ static void aok_emit_options(int fd)
  *     `functions --`, and why a user function named `print` still crosses
  *     intact while being refused as a command in here.
  *
- * That is the naming closed off. aok_serialising is the backstop for whatever
- * is not: while the state is being produced, aok_spawn_subshell refuses, so a
- * serialiser that still somehow reaches a fork fails one command instead of
- * recursing until the app dies. */
+ * That is the naming closed off IN THE PARENT. aok_serialising is the backstop
+ * for whatever is not: while the state is being produced, aok_spawn_subshell
+ * refuses, so a serialiser that still somehow reaches a fork fails one command
+ * instead of recursing until the app dies.
+ *
+ * AND THE SAME PROBLEM AT THE OTHER END OF THE PIPE.
+ *
+ * Everything above is about the text the parent PARSES. The text the parent
+ * PRODUCES is the larger exposure, and it was left open: rule (2) requires the
+ * user's function definitions to come BEFORE the aliases, so by the time the
+ * child reaches the bare words that carry the rest of the state -- `alias`,
+ * `zstyle`, `hash -d`, `functions -M`, and every `builtin`-prefixed line this
+ * file writes from C -- it has already defined functions with those names, and
+ * a shell function shadows a builtin. The state then ran the USER's code
+ * instead of the shell's, in the child, with the subshell's stdout live:
+ *
+ *     alias() { ... }      every alias lost, and the function's output
+ *                          injected into the subshell's captured value. This
+ *                          fires on EVERY shell, because `zsh -f` is born with
+ *                          the run-help and which-command aliases.
+ *     zstyle() { ... }     every zstyle silently dropped
+ *     hash() { ... }       every named directory dropped
+ *     functions() { ... }  every `functions -M` math function dropped
+ *     builtin() { ... }    the options, traps, autoloads, command hash, sticky
+ *                          emulations, floats and the whole epilogue dropped
+ *
+ * `typeset` is not on that list only because zsh's parser resolves declaration
+ * commands itself and a shell function cannot shadow one -- verified against
+ * zsh 5.9 -- which is luck rather than protection, and not luck that holds for
+ * the other five.
+ *
+ * When such a body FORKS it stops being state loss and becomes an app-killer.
+ * `alias() { print "A$(echo X)" }` is enough: the child sources the state,
+ * reaches `alias run-help=man`, runs the function, the command substitution
+ * needs a fork, the fork re-launches a GRANDCHILD, and the grandchild sources
+ * the same state and does it again. It produced no output at all, 1.1 GB of
+ * RSS in eight seconds and still climbing, and it never terminated. The
+ * aok_serialising backstop cannot see it: that flag is __thread and per shell,
+ * and here every level of the regress is a different shell on a different
+ * guest task thread.
+ *
+ * So the child gets the parent's answer, applied where the child reads the
+ * state: aok_state_armour_on/off below are the same three saves, called by
+ * aok_run_state_script around execstring and by aok_child_init around the
+ * source of the pipe. Sharing the code is the point -- the two ends cannot
+ * drift apart, and a word added for one is protected at both. That closes the
+ * CLASS: no word the state uses in command position can be hijacked, whatever
+ * the user called their function.
+ *
+ * aok_sourcing_state is the child's half of the aok_serialising backstop, for
+ * the same reason the parent has one. Nothing in the state has any business
+ * forking -- it is builtins and definitions from end to end -- so a fork
+ * attempted while the state is being sourced is by definition the regress
+ * above, and refusing it fails one line of state instead of the app. */
 
 /* Set for the duration of aok_write_state; read by aok_spawn_subshell. */
 static __thread int aok_serialising = 0;
 
-/* The words aok_state_script runs as commands. Reserved words are not in the
- * list because a shell function cannot shadow one -- the parser resolves those
- * before it ever looks at shfunctab -- but `disable -r for` can, which is what
- * the DISABLED sweep is for. */
+/* Set for the duration of the child's source() of the state; read by
+ * aok_spawn_subshell. Separate from aok_serialising because they are different
+ * shells and a shell can be doing one without the other. */
+static __thread int aok_sourcing_state = 0;
+
+/* The words the state uses as commands, at either end. Reserved words are not
+ * in the list because a shell function cannot shadow one -- the parser
+ * resolves those before it ever looks at shfunctab -- but `disable -r for`
+ * can, which is what the DISABLED sweep is for.
+ *
+ * The first line is what aok_state_script itself runs in the parent. The
+ * second is what only the CHILD sees: `builtin`, which prefixes every line
+ * this file emits from C and was therefore the single word that could undo all
+ * of them at once; `unsetopt` and `unset`, which the option block and the
+ * unset-specials line use; and `trap` and `autoload`, which today are reached
+ * only through `builtin` and so are already covered by it -- they are listed
+ * anyway so that dropping a `builtin ` prefix somewhere cannot quietly reopen
+ * this. A word costs one strcmp on a command lookup that only happens while
+ * the state is being parsed. */
 static const char *const aok_script_words[] = {
     "emulate", "setopt", "local", "typeset", "zmodload", "print",
-    "functions", "alias", "zstyle", "hash", "continue", "return", NULL
+    "functions", "alias", "zstyle", "hash", "continue", "return",
+    "builtin", "unsetopt", "unset", "trap", "autoload", NULL
 };
 
 static __thread GetNodeFunc aok_real_shfunc_getnode;
@@ -808,12 +874,47 @@ static void aok_undisable_node(HashNode hn, UNUSED(int flags))
     hn->flags &= ~DISABLED;
 }
 
+/* The three saves described above aok_serialising, as a pair so that both ends
+ * of the pipe get exactly the same protection from exactly the same code.
+ *
+ * The saved noaliases goes in *ONOALIASES rather than in a file-static,
+ * because the parent can be armoured while a child of it is armouring itself:
+ * they are different threads, but a static would still be one variable per
+ * shell and this pair does not nest within a shell.
+ *
+ * noaliases here is not the same statement as the state's own `setopt
+ * no_aliases` first line (rule 1). That line is shell text, so it can only
+ * take effect once something has parsed it; this is the lexer's own flag, set
+ * before the first byte of the state is read, and it holds even if the line
+ * that was supposed to set the option never ran. */
+static void aok_state_armour_on(int *onoaliases)
+{
+    *onoaliases = noaliases;
+    noaliases = 1;
+    aok_ndisabled = 0;
+    scanhashtable(builtintab, 0, 0, 0, aok_undisable_node, 0);
+    scanhashtable(reswdtab, 0, 0, 0, aok_undisable_node, 0);
+    aok_real_shfunc_getnode = shfunctab->getnode;
+    shfunctab->getnode = aok_shfunc_getnode;
+}
+
+static void aok_state_armour_off(int onoaliases)
+{
+    int i;
+
+    shfunctab->getnode = aok_real_shfunc_getnode;
+    for (i = 0; i < aok_ndisabled; i++)
+	aok_disabled[i]->flags |= DISABLED;
+    aok_ndisabled = 0;
+    noaliases = onoaliases;
+}
+
 static int aok_run_state_script(int fd)
 {
     int saved_out, ret = 0;
     int olastval, oerrflag, otrap_state, onoerrexit, oexit_pending;
     int odebug, ozerr;
-    int onoaliases, i;
+    int onoaliases;
 
     fflush(stdout);
     if ((saved_out = dup(1)) < 0)
@@ -860,23 +961,13 @@ static int aok_run_state_script(int fd)
     sigtrapped[SIGZERR] |= ZSIG_IGNORED;
 
     /* The parent-proofing described above. */
-    onoaliases = noaliases;
-    noaliases = 1;
-    aok_ndisabled = 0;
-    scanhashtable(builtintab, 0, 0, 0, aok_undisable_node, 0);
-    scanhashtable(reswdtab, 0, 0, 0, aok_undisable_node, 0);
-    aok_real_shfunc_getnode = shfunctab->getnode;
-    shfunctab->getnode = aok_shfunc_getnode;
+    aok_state_armour_on(&onoaliases);
 
     pushheap();
     execstring(dupstring(aok_state_script), 1, 0, "aok-state");
     popheap();
 
-    shfunctab->getnode = aok_real_shfunc_getnode;
-    for (i = 0; i < aok_ndisabled; i++)
-	aok_disabled[i]->flags |= DISABLED;
-    aok_ndisabled = 0;
-    noaliases = onoaliases;
+    aok_state_armour_off(onoaliases);
 
     fflush(stdout);
 
@@ -1418,7 +1509,8 @@ static void aok_emit_tables(int fd)
  * which is where typeset stores the digit count. "%.17g" is the shortest form
  * that reads back as the identical double, and the child's assignment to a
  * numeric parameter is an arithmetic evaluation, so a plain numeric literal is
- * all it needs.
+ * all it needs -- with the one wrinkle about integral values that the emitter
+ * below explains.
  *
  * Special floats are not emitted here, for the same reason rule (10) does not
  * carry them: the only way to have one is `typeset -F SECONDS`, and SECONDS is
@@ -1432,6 +1524,7 @@ static void aok_emit_one_float(HashNode hn, UNUSED(int flags))
     int pmf = pm->node.flags;
     double d;
     char val[80];
+    int n;
 
     if (!(pmf & (PM_FFLOAT|PM_EFLOAT)))
 	return;
@@ -1471,7 +1564,22 @@ static void aok_emit_one_float(HashNode hn, UNUSED(int flags))
 	fprintf(aok_float_out, " -- %s\n", hn->nam);
 	return;
     }
-    snprintf(val, sizeof(val), "%.17g", d);
+    n = snprintf(val, sizeof(val), "%.17g", d);
+    /* "%.17g" of a value with no fractional part has no decimal point, and for
+     * NEGATIVE ZERO that silently throws the value away. `-0` is not a float
+     * literal to zsh's arithmetic; it is unary minus applied to the INTEGER 0,
+     * and -0 == 0, so the sign bit the parent held did not survive: a parent
+     * where $(( 1/n )) is -Inf handed the child an n for which it is +Inf,
+     * which a real fork never does. The `typeset -p` path this emitter
+     * replaced happened to get this one case right, because convfloat always
+     * prints a point -- so it was a regression rather than an old hole.
+     *
+     * Forcing a point on every integral value, rather than special-casing the
+     * sign bit, is deliberate: it makes each emitted number a float literal
+     * instead of an integer expression, which is what the parameter it is
+     * being assigned to actually holds. */
+    if (n > 0 && (size_t) n + 3 <= sizeof(val) && !strpbrk(val, ".eE"))
+	memcpy(val + n, ".0", 3);
     fprintf(aok_float_out, " -- %s=%s\n", hn->nam, val);
 }
 
@@ -1798,7 +1906,13 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
      * SIGBUS with the app's whole address space. One failed command is the
      * better answer, and the caller already knows how to report a fork that
      * did not happen. */
-    if (aok_serialising) {
+    /* And the mirror image of it: a fork asked for while this shell is
+     * SOURCING a state is the same regress seen from the other end, and it is
+     * the one that actually killed the app, because each level of it is a new
+     * shell on a new thread and no per-shell flag can see the tower. The state
+     * is builtins and definitions from end to end and never legitimately
+     * forks, so this cannot refuse anything the state meant to do. */
+    if (aok_serialising || aok_sourcing_state) {
 	errno = ENOSYS;
 	return (pid_t) -1;
     }
@@ -2163,7 +2277,7 @@ static void aok_restore_lastval(char *lastvalstr)
 void aok_child_init(void)
 {
     char *fdstr, *lastvalstr, *pipes, *end, *histfile = NULL;
-    int fd, devnull, saved_err = -1, incmd;
+    int fd, devnull, saved_err = -1, incmd, onoaliases;
     long v;
     enum source_return ret = SOURCE_OK;
 
@@ -2254,7 +2368,16 @@ void aok_child_init(void)
      * is set, and execlist skips its two DEBUG sites outright. It is the same
      * answer at both ends of the pipe; only the way of saying it differs. */
     intrap++;
+    /* And the child's half of the parent-proofing, for the reasons set out
+     * above aok_serialising: the state defines the user's functions before it
+     * runs the words that carry the rest of itself, so without this a function
+     * named `alias`, `hash`, `zstyle`, `functions` or `builtin` ate everything
+     * emitted after it -- and one that forked took the app down. */
+    aok_state_armour_on(&onoaliases);
+    aok_sourcing_state++;
     ret = source("(aok subshell state)");
+    aok_sourcing_state--;
+    aok_state_armour_off(onoaliases);
     intrap--;
 
     if (saved_err >= 0) {

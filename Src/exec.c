@@ -269,6 +269,67 @@ static __thread int zsh_eval_context_len;
 /* number of in-use elements in zsh_eval_context array */
 static __thread int zsh_eval_context_alen;
 
+/* AOK: telling a re-launched pipeline element that its stdin or stdout is a
+ * PIPELINE descriptor, and so belongs in a multio.
+ *
+ * Upstream hands a forked pipeline element the pipe as a plain descriptor in
+ * `input`/`output`, and execcmd_exec adds it to fd 0 or fd 1 before walking
+ * the redirections -- which is the whole mechanism by which `echo hi > f |
+ * cat` writes the file AND feeds cat. A re-launch cannot do that: the child is
+ * a fresh zsh that starts with the pipe already installed as its stdin or
+ * stdout, so it re-parses `echo hi > f`, sees output == 0 and one redirection,
+ * builds no multio, and the file quietly replaces the pipe. f was written,
+ * `$?` was 0, nothing was printed, and cat received nothing at all.
+ *
+ * So the parent says so, in one environment variable, and only when its scan
+ * (aok_multio_fd) found a multio -- every other pipeline element behaves
+ * exactly as before. The child does not need the descriptor NUMBER, only the
+ * fact: it dups its own fd 0 or fd 1, which IS the pipe, and hands the dup to
+ * addfd as the `input`/`output` upstream would have passed. Two bits:
+ *
+ *     1  stdin is the pipeline's, so treat it as `input`
+ *     2  stdout is the pipeline's, so treat it as `output`
+ *
+ * WHEN IT IS READ is as load-bearing as what it says. It cannot be applied at
+ * the top of execcmd_exec, because a non-zero `output` is one of the things
+ * that makes execcmd_exec decide to fork -- so the child would re-launch
+ * itself, forever. It is applied at the one point where the descriptors are
+ * consumed, immediately before addfd, which is past both fork decisions.
+ *
+ * And it must survive the state script. AOK_ZSH_INHERIT's own INCMD bit has
+ * the same problem and aok_child_init solves it by installing the flag after
+ * the state is sourced; this rides on the result, latching in execlist at the
+ * moment that flag is consumed, so the sublist that gets the descriptors is
+ * the command the child was launched to run and not `setopt no_aliases`. */
+#define AOK_VAR_PIPEIO "AOK_ZSH_PIPEIO"
+#define AOK_PIPEIO_IN  1
+#define AOK_PIPEIO_OUT 2
+
+/* Latched by execlist for the launched command, spent by its first
+ * execcmd_exec. */
+static __thread int aok_pipeio_pending;
+
+/* Read the variable and take it out of this shell for good: it is imported as
+ * an exported parameter like anything else in the environment, so leaving it
+ * would export it to every program this shell runs and to every child it
+ * re-launches. Copied before the unset, because getsparam points INTO the
+ * parameter table and unsetparam frees that. */
+static int aok_pipeio_inherit(void)
+{
+    char *val, *end;
+    long bits;
+
+    if (!(end = getsparam(AOK_VAR_PIPEIO)))
+	return 0;
+    val = ztrdup(end);
+    unsetparam(AOK_VAR_PIPEIO);
+    bits = strtol(val, &end, 10);
+    if (*end != '\0' || bits < 0)
+	bits = 0;
+    zsfree(val);
+    return (int) bits & (AOK_PIPEIO_IN | AOK_PIPEIO_OUT);
+}
+
 /* Execution functions. */
 
 static int (*execfuncs[WC_COUNT-WC_CURSH]) (Estate, int) = {
@@ -1471,8 +1532,12 @@ execlist(Estate state, int dont_change_job, int exiting)
 	 * does run through execlist, so their DEBUG firing is not spurious. */
 	int aok_incmd = aok_relaunch_incmd;
 	aok_relaunch_incmd = 0;
-	if (aok_incmd)
+	if (aok_incmd) {
 	    this_donetrap = 1;
+	    /* The same sublist, and only it, is the one whose descriptors the
+	     * spawner meant. See AOK_VAR_PIPEIO. */
+	    aok_pipeio_pending = aok_pipeio_inherit();
+	}
 	this_noerrexit = 0;
 
 	ltype = WC_LIST_TYPE(code);
@@ -2380,38 +2445,39 @@ clobber_open(struct redir *f)
     return -1;
 }
 
-/* size of buffer for tee and cat processes */
-#define TCBUFSIZE 4092
+/* AOK: the byte pump closemn() forks, as a program of its own. Registered in
+ * kernel/native.c; the long note is in kernel/zsh_glue.c beside the code. Both
+ * the pump's buffer (upstream's TCBUFSIZE, which went with the fork) and
+ * closeallelse()'s loop moved there or into aok_multio_spawn below. */
+#define AOK_MULTIO_PATH "/AOK/native/zsh-multio"
 
 /* AOK: would these redirections form a multio, and on which descriptor?
  *
  * A multio -- two or more redirections onto one descriptor, which MULTIOS
- * makes the default -- is the one redirection zsh implements with a forked
- * byte pump, and closemn() below explains why that fork has no re-launch
- * equivalent. What this function is for is the DAMAGE that came with finding
- * out too late.
+ * makes the default -- is implemented by closemn() below with a byte pump, and
+ * every shape that keeps the pump inside one shell now works without anyone
+ * having to answer this question in advance. One shape does not, and it is the
+ * only reason this scan still exists: a PIPELINE element.
  *
- * Upstream discovers the multio inside addfd(), by which time every target
- * file has already been opened with O_TRUNC. So `echo hi > log > log.bak`
- * emptied BOTH files and then failed, which is worse than either succeeding or
- * refusing: the shell destroyed data and produced none. It was silent as well
- * -- zfork() had already called zerr(), and zerr() returns without printing
- * once errflag is set, so closemn's message naming the construct and the
- * `unsetopt multios' workaround was dead code and the user saw only "fork
- * failed: function not implemented". And because nothing set lastval, `$?` was
- * 0 and the rest of the script was abandoned with a success status.
+ * `echo hi > f | cat` is a multio on fd 1 -- real zsh fans stdout out to the
+ * file and the pipe both -- and upstream gets there because the forked child
+ * is handed the pipe as a plain descriptor in `output`, which execcmd_exec
+ * adds to fd 1 before walking the redirections. Native zsh has no forked
+ * child: it RE-LAUNCHES the element with the pipe already installed as the new
+ * shell's stdout, so that shell re-parses `echo hi > f` with output == 0, sees
+ * a single redirection, and correctly concludes there is no multio. The pipe
+ * is then simply overwritten by the file.
  *
- * Answering the question BEFORE the redirection loop opens anything turns all
- * three into one ordinary failed redirection: nothing is truncated, the
- * message says which descriptor and what to do about it, `$?` is 1, and the
- * shell carries on. It is a scan of the same list the loop is about to walk,
- * with zsh's own rules -- so a shape it does not recognise simply falls
- * through to the old late failure rather than being wrongly refused here.
+ * The outcome was the worst of the ones available: f was written, `$?` was 0,
+ * nothing was printed, and the downstream command silently received no input
+ * at all. So the element has to be TOLD, before it is launched, that the
+ * descriptor it was handed is a pipeline descriptor and belongs in the multio
+ * -- which is what aok_pipeio below carries, and what this scan decides.
  *
- * `input` and `output` are the pipeline's descriptors, which execcmd_exec adds
- * to fds 0 and 1 before the loop runs: `echo hi > f | cat` is a multio on fd 1
- * exactly like `echo hi > f > g`, and f is a file that would have been
- * truncated for nothing.
+ * It is a scan of the same list execcmd_exec's redirection loop is about to
+ * walk, with zsh's own rules, so a shape it does not recognise is simply not
+ * told -- which costs that shape the pipe half of its multio, and nothing
+ * else.
  *
  * Returns the descriptor, or -1 for "not a multio". */
 static int aok_multio_fd(LinkList redirs, int input, int output)
@@ -2448,6 +2514,35 @@ static int aok_multio_fd(LinkList redirs, int input, int output)
 	}
 	if (fn->type == REDIR_HEREDOC || fn->type == REDIR_HEREDOCDASH)
 	    continue;			/* already turned into a here-string */
+	if (fn->type == REDIR_MERGEIN || fn->type == REDIR_MERGEOUT) {
+	    /* A CLOSE never reaches this scan as REDIR_CLOSE. `>&-` and `<&-`
+	     * are parsed as a MERGE whose name is "-", and it is expandredir()
+	     * in glob.c that rewrites them -- inside the redirection loop this
+	     * function runs ahead of. So the REDIR_CLOSE branch above is
+	     * unreachable from this call site, and every close was being scored
+	     * as a second write on its descriptor.
+	     *
+	     * A close is not a sink, it is the reset the REDIR_CLOSE branch
+	     * already performs -- so perform it, using the same test the
+	     * globber uses to recognise one.
+	     *
+	     * This mattered a great deal more when a `yes' here meant refusing
+	     * the command: `exec 3> file 3>&-` did not create the file at all,
+	     * and `echo hi > f >&-`, `cat < f <&-` and `ls /nope 2> f 2>&-`
+	     * were all rejected outright. Now a `yes' only means the pipeline
+	     * element is told about its own descriptor, so the two kinds of
+	     * mistake are no longer comparable in cost -- a spurious yes costs
+	     * an addfd that leaves the multio at one target and does nothing,
+	     * while a spurious no still loses half a pipeline in silence. That
+	     * is why the unexpandable case below (`>&$v` with v=-) is still
+	     * scored as a write rather than skipped: over-answering is now the
+	     * cheap direction. */
+	    if (fn->name && IS_DASH(fn->name[0]) && !fn->name[1]) {
+		if (fd >= 0 && fd < 10)
+		    dir[fd] = 0;
+		continue;
+	    }
+	}
 	want = (fn->type == REDIR_INPIPE || fn->type == REDIR_HERESTR ||
 		fn->type == REDIR_READ || fn->type == REDIR_READWRITE ||
 		fn->type == REDIR_MERGEIN) ? 1 : 2;
@@ -2466,6 +2561,80 @@ static int aok_multio_fd(LinkList redirs, int input, int output)
     return -1;
 }
 
+/* AOK: start the byte pump that upstream forks, as a guest task of its own.
+ *
+ * The pump itself is kernel/zsh_glue.c's native_zsh_multio_main, reached at
+ * AOK_MULTIO_PATH; that file carries the note on why it is a separate task
+ * rather than a re-launched shell or a host thread. What is left here is the
+ * handover, and it has exactly two things to get right.
+ *
+ * THE DESCRIPTORS ARE INHERITED, so they can be named on the command line as
+ * bare numbers. A spawned guest task gets a copy of the spawner's fd table --
+ * the re-launch already depends on this for its state pipe -- and zsh's own
+ * fds are not close-on-exec (it closes them by hand in closem() instead), so
+ * mn->pipe and mn->fds[] arrive at the same numbers the parent knows them by.
+ *
+ * AND EVERYTHING ELSE MUST BE CLOSED. The loop below is upstream's
+ * closeallelse(), deleted with the fork it served, with zclose() replaced by
+ * a close file action -- and the fidelity is the point: a
+ * pump that still holds the write end of the pipe it is reading never sees
+ * EOF, and `echo hi > a > b` would hang instead of finishing. It closes fds 0,
+ * 1 and 2 along with the rest, which is why the pump has no diagnostics of its
+ * own. It is also no more work than upstream did -- the forked child ran the
+ * same loop over the same range, one close(2) at a time.
+ *
+ * No spawn attributes: the shim already gives a spawned child the mask its
+ * parent believes it has, minus what the shim itself holds, and the only thing
+ * child_block() added is SIGCHLD -- which a byte pump with no children neither
+ * blocks meaningfully nor misses.
+ *
+ * Returns the pid, or -1 with errno set. */
+static pid_t
+aok_multio_spawn(struct multio *mn)
+{
+    char **argv, *nums;
+    void *fa = NULL;
+    int i, j, err;
+    pid_t pid;
+
+    /* "zsh-multio", the mode, the pipe, one per target, and the NULL. */
+    argv = (char **) zhalloc((mn->ct + 4) * sizeof(char *));
+    /* Room for each number as text: the pipe and every target. */
+    nums = (char *) zhalloc((size_t) (mn->ct + 1) * 12);
+
+    argv[0] = "zsh-multio";
+    argv[1] = mn->rflag ? "tee" : "cat";
+    argv[2] = nums;
+    sprintf(nums, "%d", mn->pipe);
+    for (i = 0; i < mn->ct; i++) {
+	argv[3 + i] = nums + (i + 1) * 12;
+	sprintf(argv[3 + i], "%d", mn->fds[i]);
+    }
+    argv[3 + mn->ct] = NULL;
+
+    if (posix_spawn_file_actions_init(&fa) != 0) {
+	errno = ENOMEM;
+	return (pid_t) -1;
+    }
+    for (i = 0; i < fdtable_size; i++) {
+	if (mn->pipe == i)
+	    continue;
+	for (j = 0; j < mn->ct; j++)
+	    if (mn->fds[j] == i)
+		break;
+	if (j == mn->ct)
+	    posix_spawn_file_actions_addclose(&fa, i);
+    }
+
+    err = posix_spawn(&pid, AOK_MULTIO_PATH, &fa, NULL, argv, environ);
+    posix_spawn_file_actions_destroy(&fa);
+    if (err != 0) {
+	errno = err;
+	return (pid_t) -1;
+    }
+    return pid;
+}
+
 /* close an multio (success) */
 
 /**/
@@ -2474,8 +2643,7 @@ closemn(struct multio **mfds, int fd, int type)
 {
     if (fd >= 0 && mfds[fd] && mfds[fd]->ct >= 2) {
 	struct multio *mn = mfds[fd];
-	char buf[TCBUFSIZE];
-	int len, i;
+	int i;
 	pid_t pid;
 	struct timespec bgtime;
 
@@ -2485,83 +2653,37 @@ closemn(struct multio **mfds, int fd, int type)
 	 * is set up to handle it.
 	 */
 	child_block();
-	/* AOK: NOT converted to a re-launch, and this is the one site where
-	 * that is a considered decision rather than a limitation of the design.
-	 *
-	 * This child is not a shell at all -- it is a byte pump between one
-	 * descriptor and several, with no shell state of any kind. Handing it
-	 * to a whole re-launched zsh would be absurd, and it cannot be a host
-	 * thread either, because the parent must CLOSE these descriptors and a
-	 * thread shares them. The right answer is a tiny native helper spawned
-	 * with file actions, which is a piece of work of its own.
-	 *
-	 * So MULTIOS with two or more redirections on one descriptor --
-	 * `echo x > a > b`, `cat < a < b` -- still fails, with zfork's message
-	 * plus the one below naming the construct. Everything else about
-	 * redirection works. */
-	if ((pid = zfork(&bgtime))) {
+	/* zfork()'s two preliminaries, which the spawn does not inherit by
+	 * being a spawn: room in the job table for the process addproc is
+	 * about to record, and the start time the job will be measured from. */
+	if (thisjob != -1 && thisjob >= jobtabsize - 1 && !expandjobtab()) {
+	    zerr("job table full");
 	    for (i = 0; i < mn->ct; i++)
 		zclose(mn->fds[i]);
 	    zclose(mn->pipe);
-	    if (pid == -1) {
-		/* The backstop for a shape aok_multio_fd did not recognise.
-		 * errflag has to be cleared across the zerr: zfork() has just
-		 * set it, and zerr() returns without printing when it is set,
-		 * so this message -- the only one that names the construct --
-		 * used to be dead code behind zfork's generic "fork failed".
-		 * It goes back on afterwards, because the command really has
-		 * failed. */
-		int oerrflag = errflag;
-
-		errflag = 0;
-		zerr("multios (two or more redirections on one descriptor) "
-		     "are not implemented in native zsh; "
-		     "use `unsetopt multios' or redirect once");
-		errflag = oerrflag | ERRFLAG_ERROR;
-		lastval = 1;
-		mfds[fd] = NULL;
-		child_unblock();
-		return;
-	    }
-	    mn->ct = 1;
-	    mn->fds[0] = fd;
-	    addproc(pid, NULL, 1, &bgtime, -1, -1);
+	    mfds[fd] = NULL;
 	    child_unblock();
 	    return;
 	}
-	/* pid == 0 */
-	opts[INTERACTIVE] = 0;
-	dont_queue_signals();
-	child_unblock();
-	closeallelse(mn);
-	if (mn->rflag) {
-	    /* tee process */
-	    while ((len = read(mn->pipe, buf, TCBUFSIZE)) != 0) {
-		if (len < 0) {
-		    if (errno == EINTR)
-			continue;
-		    else
-			break;
-		}
-		for (i = 0; i < mn->ct; i++)
-		    if (write_loop(mn->fds[i], buf, len) < 0)
-			break;
-	    }
-	} else {
-	    /* cat process */
-	    for (i = 0; i < mn->ct; i++)
-		while ((len = read(mn->fds[i], buf, TCBUFSIZE)) != 0) {
-		    if (len < 0) {
-			if (errno == EINTR && !isatty(mn->fds[i]))
-			    continue;
-			else
-			    break;
-		    }
-		    if (write_loop(mn->pipe, buf, len) < 0)
-			break;
-		}
+	zgettime_monotonic_if_available(&bgtime);
+	pid = aok_multio_spawn(mn);
+	for (i = 0; i < mn->ct; i++)
+	    zclose(mn->fds[i]);
+	zclose(mn->pipe);
+	if (pid == -1) {
+	    /* The same message addfd() uses for the other ways a multio can
+	     * fail to be built, because to the user it is the same failure. */
+	    zerr("multio failed for fd %d: %e", fd, errno);
+	    lastval = 1;
+	    mfds[fd] = NULL;
+	    child_unblock();
+	    return;
 	}
-	_exit(0);
+	mn->ct = 1;
+	mn->fds[0] = fd;
+	addproc(pid, NULL, 1, &bgtime, -1, -1);
+	child_unblock();
+	return;
     } else if (fd >= 0 && type == REDIR_CLOSE)
 	mfds[fd] = NULL;
 }
@@ -2579,25 +2701,6 @@ closemnodes(struct multio **mfds)
 	    for (j = 0; j < mfds[i]->ct; j++)
 		zclose(mfds[i]->fds[j]);
 	    mfds[i] = NULL;
-	}
-}
-
-/**/
-static void
-closeallelse(struct multio *mn)
-{
-    int i, j;
-    long openmax;
-
-    openmax = fdtable_size;
-
-    for (i = 0; i < openmax; i++)
-	if (mn->pipe != i) {
-	    for (j = 0; j < mn->ct; j++)
-		if (mn->fds[j] == i)
-		    break;
-	    if (j == mn->ct)
-		zclose(i);
 	}
 }
 
@@ -3042,7 +3145,7 @@ static void sp_pgid_join(struct aok_spawn *sp, pid_t pgid)
 static int
 execcmd_fork(Estate state, int how, int type, Wordcode varspc,
 	     LinkList *filelistp, char *text, char *aoktext, int input,
-	     int output, int oautocont, int close_if_forked)
+	     int output, int oautocont, int close_if_forked, int aok_pipeio)
 {
     pid_t pid;
     struct entersubsh_ret esret;
@@ -3131,7 +3234,20 @@ execcmd_fork(Estate state, int how, int type, Wordcode varspc,
 	sp.stdin_null = isatty(0);
     aok_spawn_close(&sp, close_if_forked);
 
+    /* AOK: which of the child's standard descriptors is the PIPELINE's, for
+     * the element that needs to know. In the environment because that is the
+     * one channel to a re-launched child this side of the fence can add to --
+     * aok_relaunch_env copies `environ` -- and taken back out immediately,
+     * so no other child of this shell inherits it. See AOK_VAR_PIPEIO. */
+    if (aok_pipeio) {
+	char buf[32];
+
+	sprintf(buf, "%d", aok_pipeio);
+	setenv(AOK_VAR_PIPEIO, buf, 1);
+    }
     pid = aok_spawn_subshell(aoktext, &sp);
+    if (aok_pipeio)
+	unsetenv(AOK_VAR_PIPEIO);
     if (pid == -1) {
 	zerr("subshell failed: %e", errno);
 	lastval = 1;
@@ -3202,7 +3318,7 @@ execcmd_exec(Estate state, Execcmd_params eparams,
     char *text;
     int save[10];
     int fil, dfil, is_cursh = 0, do_exec = 0, redir_err = 0, i;
-    int nullexec = 0, magic_assign = 0, forked = 0, old_lastval;
+    int nullexec = 0, magic_assign = 0, forked = 0, old_lastval, aok_pipeio = 0;
     int is_shfunc = 0, is_builtin = 0, is_exec = 0, use_defpath = 0;
     /* Various flags to the command. */
     int cflags = 0, orig_cflags = 0, checked = 0, oautocont = -1;
@@ -3278,6 +3394,33 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	    pushnode(args, dupstring("fg"));
     }
 
+    /* AOK: the PIPELINE's descriptors have to be judged here, before the
+     * re-launch below, because the child it hands them to cannot see them.
+     *
+     * `echo hi > f | cat` is a multio on fd 1 -- real zsh fans stdout out to
+     * the file and the pipe both. Native zsh re-launches the pipeline element
+     * with the pipe already installed as its stdout, so the child re-parses
+     * `echo hi > f` with output == 0 and a single redirection and correctly
+     * concludes there is no multio there. Nothing on either side saw the
+     * shape, and the outcome was the worst of the ones available: f was
+     * written, `$?` was 0, NOTHING was printed, and the downstream command
+     * silently received no input at all.
+     *
+     * The answer is carried to the child in AOK_VAR_PIPEIO -- see the note
+     * there -- which is why what is recorded here is which of the two
+     * descriptors is the pipeline's, and not merely that a multio exists.
+     *
+     * Only when a pipeline descriptor is actually in play, so that a multio
+     * with nothing to do with the pipe costs nothing; and never for a named
+     * function definition, which does not perform its redirections but stores
+     * them (see the `redir = NULL` further down), so that `f() { ... } > a > b
+     * | cat` defines a function here exactly as zsh does. An anonymous
+     * function does redirect, and does reach this. */
+    if ((input || output) && type != WC_FUNCDEF &&
+	aok_multio_fd(redir, input, output) >= 0)
+	aok_pipeio = (input ? AOK_PIPEIO_IN : 0) |
+		     (output ? AOK_PIPEIO_OUT : 0);
+
     if ((how & Z_ASYNC) || output ||
 	(last1 == 2 && input && EMULATION(EMULATE_SH))) {
 	/*
@@ -3305,7 +3448,7 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	aoktext = getpermtext(state->prog, eparams->beg, 0);
 	switch (execcmd_fork(state, how, type, varspc, &filelist,
 			     text, aoktext, input, output, oautocont,
-			     close_if_forked)) {
+			     close_if_forked, aok_pipeio)) {
 	case -1:
 	    goto fatal;
 	case 0:
@@ -4017,7 +4160,7 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 		text = dupstring(getjobtext(state->prog, eparams->beg));
 	    switch (execcmd_fork(state, how, type, varspc, &filelist,
 				 text, aoktext, input, output, oautocont,
-				 close_if_forked)) {
+				 close_if_forked, aok_pipeio)) {
 	    case -1:
 		goto fatal;
 	    case 0:
@@ -4072,25 +4215,28 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	}
     }
 
-    /* AOK: refuse a multio here, before anything is opened. See aok_multio_fd
-     * for what the late refusal destroyed. Deliberately ahead of spawnpipes()
-     * too, so a `> >(cmd)` that is part of the doomed construct does not start
-     * a process substitution nobody will ever read. */
-    {
-	int aokfd = aok_multio_fd(redir, input, output);
+    /* AOK: if this shell was re-launched to BE a pipeline element, the pipe it
+     * was handed is on fd 0 or fd 1 rather than in `input`/`output`, and the
+     * two addfd calls below are the only reason the distinction matters. See
+     * AOK_VAR_PIPEIO for why a dup of the descriptor is the whole answer, and
+     * why this cannot happen any earlier in this function.
+     *
+     * A scan also used to sit here refusing multios outright, before the loop
+     * further down opened -- and so truncated -- their target files. closemn()
+     * implements them now, so there is nothing left to refuse. */
+    if (aok_pipeio_pending) {
+	int bits = aok_pipeio_pending, dupfd;
 
-	if (aokfd >= 0) {
-	    /* zwarn, not zerr, for the same reason every other failed
-	     * redirection in this loop uses it: zerr sets errflag, and errflag
-	     * abandons the rest of the list. One bad redirection is one failed
-	     * command with `$? == 1`, not the end of the script -- which is
-	     * what `echo hi > a > b; print CONTINUED` proves, since zsh prints
-	     * CONTINUED and so, now, does this. */
-	    zwarn("multios (two or more redirections on one descriptor) are not "
-		  "implemented in native zsh: fd %d. Use `unsetopt multios', or "
-		  "redirect once and copy afterwards.", aokfd);
-	    execerr();
-	}
+	aok_pipeio_pending = 0;
+	/* movefd, as everything that becomes an mfd is moved: addfd would
+	 * otherwise be handed a descriptor in the 0-9 range it is about to
+	 * shuffle. A dup that fails leaves the element behaving as it did
+	 * before this existed, which is the pre-existing loss and not a new
+	 * one -- `cmd >&- | ...` closed the descriptor on purpose. */
+	if ((bits & AOK_PIPEIO_IN) && !input && (dupfd = movefd(dup(0))) >= 0)
+	    input = dupfd;
+	if ((bits & AOK_PIPEIO_OUT) && !output && (dupfd = movefd(dup(1))) >= 0)
+	    output = dupfd;
     }
 
     /* Add pipeline input/output to mnodes */
