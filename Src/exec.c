@@ -4168,8 +4168,36 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	     * rather than left to be discovered. */
 	    if ((type == WC_SIMPLE || type == WC_TYPESET) &&
 		args && nonempty(args) && !varspc &&
-		(!eparams->redir || empty(eparams->redir)))
-		aoktext = aok_quote_words(args);
+		(!eparams->redir || empty(eparams->redir))) {
+		/* AOK: glob BEFORE quoting, which is the whole of this fix.
+		 *
+		 * The words here are post-prefork but PRE-GLOB -- the parent's
+		 * own globlist(args, 0) is thirty lines below. zsh carries glob
+		 * metacharacters as tokens until then, and aok_quote_words()
+		 * untokenizes, so the Star token became a literal `*' and was
+		 * single-quoted into the child. The child had nothing left to
+		 * expand.
+		 *
+		 * It was silent and it was not small: `rm -f *' deleted NOTHING
+		 * whenever it was not the last command in the shell, exit status
+		 * 0, no diagnostic. Only an EXTERNAL command in non-final
+		 * position was affected -- a builtin does not fork, and the last
+		 * command is a fake exec rather than a re-launch -- which is why
+		 * it survived a 1167-case differential sweep.
+		 *
+		 * Doing it here rather than inside aok_quote_words is not a
+		 * preference: by the time that function runs the tokens are
+		 * gone, so which characters were metacharacters is no longer
+		 * knowable. globlist() honours NO_GLOB itself, and it is
+		 * idempotent against the later call because globbing consumes
+		 * tokens -- so a filename that really does contain `*' is a
+		 * literal by then and is not re-expanded. errflag is checked so
+		 * that NOMATCH stays the parent's error, reported before the
+		 * spawn, exactly as an unforked shell reports it. */
+		globlist(args, 0);
+		if (!errflag)
+		    aoktext = aok_quote_words(args);
+	    }
 	    else
 		aoktext = getpermtext(state->prog, eparams->beg, 0);
 	    if (!text)
