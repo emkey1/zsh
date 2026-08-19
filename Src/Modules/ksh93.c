@@ -224,8 +224,8 @@ ksh93_wrapper(Eprog prog, FuncWrap w, char *name)
 	setiparam(".sh.level", num);
     }
     if (zleactive) {
-	__thread extern mod_import_variable char *curkeymapname;	/* XXX */
-	__thread extern mod_import_variable char *varedarg;	/* XXX */
+	extern __thread mod_import_variable char *curkeymapname;	/* XXX */
+	extern __thread mod_import_variable char *varedarg;	/* XXX */
 	/* bindkey -v forces VIMODE so this test is as good as any */
 	if (curkeymapname && isset(VIMODE) &&
 	    strcmp(curkeymapname, "main") == 0)

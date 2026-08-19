@@ -2,9 +2,9 @@
 #ifndef have_Src_loop_globals
 #define have_Src_loop_globals
 
-__thread extern int loops;
-__thread extern mod_import_variable int contflag;
-__thread extern mod_import_variable volatile int breaks;
+extern __thread int loops;
+extern __thread mod_import_variable int contflag;
+extern __thread mod_import_variable volatile int breaks;
 extern int execfor(Estate state,int do_exec);
 extern int execselect(Estate state,UNUSED(int do_exec));
 extern size_t selectlist(LinkList l,size_t start);
@@ -12,9 +12,9 @@ extern int execwhile(Estate state,UNUSED(int do_exec));
 extern int execrepeat(Estate state,UNUSED(int do_exec));
 extern int execif(Estate state,int do_exec);
 extern int execcase(Estate state,int do_exec);
-__thread extern zlong try_errflag;
-__thread extern zlong try_interrupt;
-__thread extern zlong try_tryflag;
+extern __thread zlong try_errflag;
+extern __thread zlong try_interrupt;
+extern __thread zlong try_tryflag;
 extern int exectry(Estate state,int do_exec);
 
 #endif /* !have_Src_loop_globals */

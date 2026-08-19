@@ -2,15 +2,15 @@
 #ifndef have_Src_signals_globals
 #define have_Src_signals_globals
 
-__thread extern mod_import_variable int*sigtrapped;
-__thread extern mod_import_variable Eprog*siglists;
-__thread extern mod_import_variable volatile int nsigtrapped;
-__thread extern int in_exit_trap;
-__thread extern mod_import_variable volatile int queueing_enabled;
-__thread extern mod_import_variable volatile int queue_front;
-__thread extern mod_import_variable volatile int queue_rear;
-__thread extern mod_import_variable int signal_queue[MAX_QUEUE_SIZE];
-__thread extern mod_import_variable sigset_t signal_mask_queue[MAX_QUEUE_SIZE];
+extern __thread mod_import_variable int*sigtrapped;
+extern __thread mod_import_variable Eprog*siglists;
+extern __thread mod_import_variable volatile int nsigtrapped;
+extern __thread int in_exit_trap;
+extern __thread mod_import_variable volatile int queueing_enabled;
+extern __thread mod_import_variable volatile int queue_front;
+extern __thread mod_import_variable volatile int queue_rear;
+extern __thread mod_import_variable int signal_queue[MAX_QUEUE_SIZE];
+extern __thread mod_import_variable sigset_t signal_mask_queue[MAX_QUEUE_SIZE];
 extern mod_import_variable volatile int queue_in;
 extern mod_import_function void install_handler(int sig);
 extern mod_import_function void intr(void);
@@ -21,7 +21,7 @@ extern mod_import_function sigset_t signal_block(sigset_t set);
 extern mod_import_function sigset_t signal_unblock(sigset_t set);
 extern mod_import_function sigset_t signal_setmask(sigset_t set);
 extern int signal_suspend(UNUSED(int sig),int wait_cmd);
-__thread extern int last_signal;
+extern __thread int last_signal;
 extern void wait_for_processes(void);
 extern mod_import_function void zhandler(int sig);
 extern void killrunjobs(int from_signal);
@@ -33,9 +33,9 @@ extern void starttrapscope(void);
 extern void endtrapscope(void);
 extern void queue_traps(int wait_cmd);
 extern void unqueue_traps(void);
-__thread extern volatile int intrap;
-__thread extern volatile int trapisfunc;
-__thread extern volatile int traplocallevel;
+extern __thread volatile int intrap;
+extern __thread volatile int trapisfunc;
+extern __thread volatile int traplocallevel;
 extern void dotrap(int sig);
 extern int rtsigno(const char*signame);
 extern char*rtsigname(int signo,int alt);

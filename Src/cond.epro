@@ -2,7 +2,7 @@
 #ifndef have_Src_cond_globals
 #define have_Src_cond_globals
 
-__thread extern int tracingcond;
+extern __thread int tracingcond;
 extern int evalcond(Estate state,char*fromtest);
 extern mod_import_function char*cond_str(char**args,int num,int raw);
 extern mod_import_function zlong cond_val(char**args,int num);

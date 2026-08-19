@@ -2,22 +2,22 @@
 #ifndef have_Src_init_globals
 #define have_Src_init_globals
 
-__thread extern int noexitct;
-__thread extern char*zunderscore;
-__thread extern size_t underscorelen;
-__thread extern int underscoreused;
-__thread extern int sourcelevel;
-__thread extern mod_import_variable int SHTTY;
-__thread extern mod_import_variable FILE*shout;
-__thread extern mod_import_variable char*tcstr[TC_COUNT];
-__thread extern mod_import_variable int tclen[TC_COUNT];
-__thread extern int tclines;
-__thread extern int tccolumns;
-__thread extern mod_import_variable int hasam;
-__thread extern int hasxn;
-__thread extern mod_import_variable int tccolours;
-__thread extern mod_import_variable sigset_t sigchld_mask;
-__thread extern struct hookdef zshhooks[];
+extern __thread int noexitct;
+extern __thread char*zunderscore;
+extern __thread size_t underscorelen;
+extern __thread int underscoreused;
+extern __thread int sourcelevel;
+extern __thread mod_import_variable int SHTTY;
+extern __thread mod_import_variable FILE*shout;
+extern __thread mod_import_variable char*tcstr[TC_COUNT];
+extern __thread mod_import_variable int tclen[TC_COUNT];
+extern __thread int tclines;
+extern __thread int tccolumns;
+extern __thread mod_import_variable int hasam;
+extern __thread int hasxn;
+extern __thread mod_import_variable int tccolours;
+extern __thread mod_import_variable sigset_t sigchld_mask;
+extern __thread struct hookdef zshhooks[];
 extern enum loop_return loop(int toplevel,int justonce);
 extern mod_import_function int parseopts(char*nam,char***argvp,char*new_opts,char**cmdp,LinkList optlist,int flags);
 extern mod_import_function void init_io(char*cmd);
@@ -33,12 +33,12 @@ extern void sourcehome(char*s);
 extern void init_bltinmods(void);
 extern mod_import_function void noop_function(void);
 extern mod_import_function void noop_function_int(UNUSED(int nothing));
-__thread extern mod_import_variable ZleEntryPoint zle_entry_ptr;
-__thread extern mod_import_variable int zle_load_state;
+extern __thread mod_import_variable ZleEntryPoint zle_entry_ptr;
+extern __thread mod_import_variable int zle_load_state;
 extern mod_import_function char * zleentry(VA_ALIST_PROTO1(int cmd));
-__thread extern mod_import_variable CompctlReadFn compctlreadptr;
+extern __thread mod_import_variable CompctlReadFn compctlreadptr;
 extern mod_import_function int fallback_compctlread(char*name,UNUSED(char**args),UNUSED(Options ops),UNUSED(char*reply));
-__thread extern mod_import_variable int use_exit_printed;
+extern __thread mod_import_variable int use_exit_printed;
 extern mod_import_function int zsh_main(UNUSED(int argc),char**argv);
 
 #endif /* !have_Src_init_globals */

@@ -2,17 +2,17 @@
 #ifndef have_Src_pattern_globals
 #define have_Src_pattern_globals
 
-__thread extern mod_import_variable const char*zpc_strings[ZPC_COUNT];
-__thread extern mod_import_variable char zpc_disables[ZPC_COUNT];
-__thread extern char zpc_special[ZPC_COUNT];
+extern __thread mod_import_variable const char*zpc_strings[ZPC_COUNT];
+extern __thread mod_import_variable char zpc_disables[ZPC_COUNT];
+extern __thread char zpc_special[ZPC_COUNT];
 extern mod_import_function void clear_shiftstate(void);
 extern void patcompstart(void);
 extern mod_import_function Patprog patcompile(char*exp,int inflags,char**endexp);
 extern int patgetglobflags(char**strp,long*assertp,int*ignore);
 extern mod_import_function int range_type(char*start,int len);
 extern mod_import_function int pattern_range_to_string(char*rangestr,char*outstr);
-__thread extern int errsfound;
-__thread extern int forceerrs;
+extern __thread int errsfound;
+extern __thread int forceerrs;
 extern void pattrystart(void);
 extern mod_import_function char*patallocstr(Patprog prog,char*string,int stringlen,int unmetalen,int force,Patstralloc patstralloc);
 extern mod_import_function int pattry(Patprog prog,char*string);

@@ -2,27 +2,27 @@
 #ifndef have_Src_Zle_zle_refresh_globals
 #define have_Src_Zle_zle_refresh_globals
 
-__thread extern char*lpromptbuf;
-__thread extern char*rpromptbuf;
-__thread extern zattr pmpt_attr;
-__thread extern zattr rpmpt_attr;
-__thread extern zattr prompt_attr;
-__thread extern mod_import_variable int nlnct;
-__thread extern mod_import_variable int showinglist;
-__thread extern mod_import_variable int listshown;
-__thread extern mod_import_variable int lastlistlen;
-__thread extern mod_import_variable int clearflag;
-__thread extern mod_import_variable int clearlist;
-__thread extern int trashedzle;
-__thread extern ZLE_STRING_T predisplay;
-__thread extern ZLE_STRING_T postdisplay;
-__thread extern int predisplaylen;
-__thread extern int postdisplaylen;
-__thread extern struct region_highlight*region_highlights;
-__thread extern int n_region_highlights;
-__thread extern int region_active;
-__thread extern char*tcout_func_name;
-__thread extern int cost;
+extern __thread char*lpromptbuf;
+extern __thread char*rpromptbuf;
+extern __thread zattr pmpt_attr;
+extern __thread zattr rpmpt_attr;
+extern __thread zattr prompt_attr;
+extern __thread mod_import_variable int nlnct;
+extern __thread mod_import_variable int showinglist;
+extern __thread mod_import_variable int listshown;
+extern __thread mod_import_variable int lastlistlen;
+extern __thread mod_import_variable int clearflag;
+extern __thread mod_import_variable int clearlist;
+extern __thread int trashedzle;
+extern __thread ZLE_STRING_T predisplay;
+extern __thread ZLE_STRING_T postdisplay;
+extern __thread int predisplaylen;
+extern __thread int postdisplaylen;
+extern __thread struct region_highlight*region_highlights;
+extern __thread int n_region_highlights;
+extern __thread int region_active;
+extern __thread char*tcout_func_name;
+extern __thread int cost;
 extern char**get_region_highlight(UNUSED(Param pm));
 extern void set_region_highlight(UNUSED(Param pm),char**aval);
 extern void unset_region_highlight(Param pm,int exp);

@@ -778,28 +778,49 @@
 /* #undef HAVE_STRUCT_STAT_ST_ATIMENSEC */
 
 /* Define to 1 if 'st_atimespec.tv_nsec' is a member of 'struct stat'. */
-#define HAVE_STRUCT_STAT_ST_ATIMESPEC_TV_NSEC 1
+#if defined(__linux__)
+/* AOK: glibc spells it st_atim; Darwin, where this config.h was
+ * generated, spells it st_atimespec. zsh_system.h picks between them from
+ * these macros, so the Darwin answer names a member glibc does not have. */
+# define HAVE_STRUCT_STAT_ST_ATIM_TV_NSEC 1
+#else
+# define HAVE_STRUCT_STAT_ST_ATIMESPEC_TV_NSEC 1
+#endif
 
 /* Define to 1 if 'st_atim.tv_nsec' is a member of 'struct stat'. */
-/* #undef HAVE_STRUCT_STAT_ST_ATIM_TV_NSEC */
+/* HAVE_STRUCT_STAT_ST_ATIM_TV_NSEC is decided beside its TIMESPEC twin above. */
 
 /* Define to 1 if 'st_ctimensec' is a member of 'struct stat'. */
 /* #undef HAVE_STRUCT_STAT_ST_CTIMENSEC */
 
 /* Define to 1 if 'st_ctimespec.tv_nsec' is a member of 'struct stat'. */
-#define HAVE_STRUCT_STAT_ST_CTIMESPEC_TV_NSEC 1
+#if defined(__linux__)
+/* AOK: glibc spells it st_ctim; Darwin, where this config.h was
+ * generated, spells it st_ctimespec. zsh_system.h picks between them from
+ * these macros, so the Darwin answer names a member glibc does not have. */
+# define HAVE_STRUCT_STAT_ST_CTIM_TV_NSEC 1
+#else
+# define HAVE_STRUCT_STAT_ST_CTIMESPEC_TV_NSEC 1
+#endif
 
 /* Define to 1 if 'st_ctim.tv_nsec' is a member of 'struct stat'. */
-/* #undef HAVE_STRUCT_STAT_ST_CTIM_TV_NSEC */
+/* HAVE_STRUCT_STAT_ST_CTIM_TV_NSEC is decided beside its TIMESPEC twin above. */
 
 /* Define to 1 if 'st_mtimensec' is a member of 'struct stat'. */
 /* #undef HAVE_STRUCT_STAT_ST_MTIMENSEC */
 
 /* Define to 1 if 'st_mtimespec.tv_nsec' is a member of 'struct stat'. */
-#define HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC 1
+#if defined(__linux__)
+/* AOK: glibc spells it st_mtim; Darwin, where this config.h was
+ * generated, spells it st_mtimespec. zsh_system.h picks between them from
+ * these macros, so the Darwin answer names a member glibc does not have. */
+# define HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC 1
+#else
+# define HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC 1
+#endif
 
 /* Define to 1 if 'st_mtim.tv_nsec' is a member of 'struct stat'. */
-/* #undef HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC */
+/* HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC is decided beside its TIMESPEC twin above. */
 
 /* Define to 1 if struct timespec is defined by a system header */
 #define HAVE_STRUCT_TIMESPEC 1

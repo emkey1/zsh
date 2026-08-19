@@ -2,7 +2,7 @@
 #ifndef have_Src_Zle_compresult_globals
 #define have_Src_Zle_compresult_globals
 
-__thread extern mod_import_variable int invcount;
+extern __thread mod_import_variable int invcount;
 extern char*unambig_data(int*cp,char**pp,char**ip);
 extern mod_import_function int hasbrpsfx(Cmatch m,char*pre,char*suf);
 extern int do_ambiguous(void);

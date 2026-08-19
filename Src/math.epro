@@ -2,12 +2,12 @@
 #ifndef have_Src_math_globals
 #define have_Src_math_globals
 
-__thread extern int noeval;
-__thread extern mod_import_variable mnumber zero_mnumber;
-__thread extern mnumber lastmathval;
-__thread extern int lastbase;
-__thread extern int outputradix;
-__thread extern int outputunderscore;
+extern __thread int noeval;
+extern __thread mod_import_variable mnumber zero_mnumber;
+extern __thread mnumber lastmathval;
+extern __thread int lastbase;
+extern __thread int outputradix;
+extern __thread int outputunderscore;
 extern int isinf(double x);
 extern int isnan(double x);
 extern mod_import_function mnumber matheval(char*s);

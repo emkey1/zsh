@@ -2,12 +2,12 @@
 #ifndef have_Src_Zle_compctl_globals
 #define have_Src_Zle_compctl_globals
 
-__thread extern struct compctl cc_compos;
-__thread extern struct compctl cc_default;
-__thread extern struct compctl cc_first;
-__thread extern struct compctl cc_dummy;
-__thread extern HashTable compctltab;
-__thread extern Patcomp patcomps;
+extern __thread struct compctl cc_compos;
+extern __thread struct compctl cc_default;
+extern __thread struct compctl cc_first;
+extern __thread struct compctl cc_dummy;
+extern __thread HashTable compctltab;
+extern __thread Patcomp patcomps;
 extern int setup_(UNUSED(Module m));
 extern int features_(Module m,char***features);
 extern int enables_(Module m,int**enables);
