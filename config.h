@@ -842,7 +842,14 @@
 /* #undef HAVE_SYS_DIR_H */
 
 /* Define to 1 if you have the <sys/filio.h> header file. */
-#define HAVE_SYS_FILIO_H 1
+/* AOK: this config.h came from running configure on DARWIN, and the tree is
+ * also compiled for Linux (the CI builds, and the CLI there). <sys/filio.h> is
+ * a BSD/Solaris header -- glibc keeps FIONREAD and friends in <sys/ioctl.h>,
+ * which zsh_system.h already includes -- and glibc dropped <sys/sysctl.h> in
+ * 2.32. Claiming either on Linux stops the build at the #include. */
+#if !defined(__linux__)
+# define HAVE_SYS_FILIO_H 1
+#endif
 
 /* Define to 1 if you have the <sys/mman.h> header file. */
 #define HAVE_SYS_MMAN_H 1
@@ -888,7 +895,9 @@
 /* #undef HAVE_SYS_STROPTS_H */
 
 /* Define to 1 if you have the <sys/sysctl.h> header file. */
-#define HAVE_SYS_SYSCTL_H 1
+#if !defined(__linux__)
+# define HAVE_SYS_SYSCTL_H 1
+#endif
 
 /* Define to 1 if you have the <sys/times.h> header file. */
 #define HAVE_SYS_TIMES_H 1
