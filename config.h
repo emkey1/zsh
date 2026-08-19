@@ -136,7 +136,14 @@
 
 /* Define to 1 if you have the declaration of 'fpurge', and to 0 if you don't.
    */
-#define HAVE_DECL_FPURGE 1
+/* AOK: Darwin declares fpurge, glibc does not. Src/utils.c guards its only use
+ * with `#if HAVE_DECL_FPURGE' and has no fallback, so 0 here is what upstream
+ * intends on a platform without it: skip the purge. */
+#if defined(__linux__)
+# define HAVE_DECL_FPURGE 0
+#else
+# define HAVE_DECL_FPURGE 1
+#endif
 
 /* Define to 1 if you have the 'difftime' function. */
 #define HAVE_DIFFTIME 1
@@ -1220,7 +1227,13 @@
 /* #undef WINSIZE_IN_PTEM */
 
 /* Define if getxattr() etc. require additional MacOS-style arguments */
-#define XATTR_EXTRA_ARGS 1
+/* AOK: Darwin's getxattr/setxattr carry a position and an options word and use
+ * XATTR_NOFOLLOW for symlinks; Linux's do neither and use l-prefixed calls.
+ * Src/Modules/attr.c already writes both, choosing on this macro -- generated
+ * on Darwin, so Linux was taking the wrong arm and failing on XATTR_NOFOLLOW. */
+#if !defined(__linux__)
+# define XATTR_EXTRA_ARGS 1
+#endif
 
 /* Define to 1 if the zlong type uses 64-bit long int. */
 /* #undef ZLONG_IS_LONG_64 */
