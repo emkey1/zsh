@@ -2398,7 +2398,7 @@ static void aok_relaunch_env_free(char **vec)
  * and without this, the SHELL would get SIGPIPE and die with it. Ignoring is
  * right rather than blocking: an ignored signal is discarded, where a blocked
  * one is delivered the moment it is unblocked. */
-static void aok_write_state(int fd, int flags)
+void aok_write_state(int fd, int flags)
 {
     struct sigaction sa, old;
 

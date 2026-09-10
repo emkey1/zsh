@@ -59,6 +59,15 @@ char *aok_quote_words(LinkList args);
 /* Child side, called from init_misc before the -c string is parsed. */
 void aok_child_init(void);
 
+/* Write this shell's whole state, as the script a re-launched child sources.
+ *
+ * Not static any more because kernel/checkpoint.c wants the same bytes for a
+ * different reason: a native program is a C function on a host thread and
+ * cannot be photographed, so a checkpoint asks it to describe itself instead,
+ * and this is zsh's description. Runs on the shell's OWN thread -- everything
+ * it reads is __thread. */
+void aok_write_state(int fd, int flags);
+
 /* True when this thread's C stack is nearly spent, so that a recursion about
  * to go one level deeper refuses instead. Overrunning the stack of a native
  * program kills the app rather than the shell -- see the long comment in
