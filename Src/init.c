@@ -1590,6 +1590,29 @@ init_misc(char *cmd, char *zsh_name)
 
     if (interact && isset(RCS))
 	readhistfile(NULL, 0, HFILE_USE_OPTIONS);
+
+    /* AOK: the other way a shell inherits a state -- a CHECKPOINT.
+     *
+     * The call above is inside `if (cmd)` because fork-by-relaunch always
+     * spawns its child with -c. A shell restored from a checkpoint is the same
+     * mechanism with a different argv: kernel/checkpoint.c re-launches the
+     * program the image named, with the argv it had, which for an interactive
+     * shell has no -c at all. So `cmd` is NULL, the call above never runs, and
+     * the state the checkpoint went to the trouble of capturing sits unread on
+     * the descriptor it was handed.
+     *
+     * That failed silently and looked like success: the restored shell came up
+     * wearing the environment (the checkpoint carries that separately, in the
+     * task record) and nothing else. Exported parameters were there, so it
+     * read as a working session -- while every non-exported parameter,
+     * function, alias and option the person had was gone.
+     *
+     * HERE rather than beside the other call, because this is after the rc
+     * files: a restored state must WIN over ~/.zshrc, which has just run for
+     * the second time in this shell's life. Guarded on the variable so an
+     * ordinary interactive zsh reaches none of it. */
+    if (getsparam("AOK_ZSH_STATE_FD") != NULL)
+	aok_child_init();
 }
 
 /*
