@@ -2402,6 +2402,27 @@ void aok_write_state(int fd, int flags)
 {
     struct sigaction sa, old;
 
+    /* The shell may not exist yet.
+     *
+     * A checkpoint can park a native zsh at its very FIRST syscall -- inside
+     * parseopts, long before setupvals and init_signals -- and then ask it to
+     * describe itself. sigtrapped is allocated by init_signals (init.c), so it
+     * is still NULL there, and aok_run_state_script's sigtrapped[SIGDEBUG]
+     * read faults: SIGDEBUG is SIGCOUNT+2, index 32, four bytes each, which is
+     * the 0x80 in the device crash report.
+     *
+     * Nothing worth serialising exists that early in any case: a shell that has
+     * not finished starting has no functions, no options and no parameters of
+     * its own yet. Writing nothing is therefore both safe AND accurate -- the
+     * kernel reads an empty state as "re-launch this one fresh", which is
+     * exactly what such a shell needs.
+     *
+     * sigtrapped is the right marker rather than merely the one that crashed:
+     * init_signals runs AFTER setupvals, so a non-NULL sigtrapped means the
+     * parameter and function tables this dump walks are built too. */
+    if (sigtrapped == NULL)
+	return;
+
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = SIG_IGN;
     sigemptyset(&sa.sa_mask);
