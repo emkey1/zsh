@@ -1149,6 +1149,26 @@ countprompt(char *str, int *wp, int *hp, int overf)
     memset(&mbs, 0, sizeof(mbs));
 #endif
 
+    /* No prompt at all is a state this really reaches.
+     *
+     * lpromptbuf is __thread and starts NULL; only zleread() ever fills it in
+     * (Src/Zle/zle_main.c). resetvideo() passes it here unconditionally, so any
+     * refresh that happens BEFORE the line editor has expanded a prompt walks a
+     * null pointer -- `for (; *str; ...)` faults on the first read.
+     *
+     * That is not hypothetical: loading zsh/zle runs the terminal probe
+     * (setup_ -> query_terminal -> probe_terminal -> getbyte -> zrefresh ->
+     * resetvideo), and under AOK a checkpoint-restored shell replays its module
+     * list from a saved state script during startup, long before any prompt
+     * exists. Device crashes 2026-09-12, SIGSEGV at address 0 in countprompt+80.
+     *
+     * Treating it as the empty string rather than returning early keeps the
+     * answer consistent with the rest of the function: an absent prompt is zero
+     * columns wide and one line tall, which is what the loop below computes for
+     * "" anyway. */
+    if (str == NULL)
+	str = "";
+
     for (; *str; str++) {
 	/*
 	 * Avoid double-incrementing the height when there's a newline in the
