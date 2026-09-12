@@ -999,6 +999,31 @@ zrefresh(void)
     if (inlist)
 	return;
 
+    /* ZLE is not running: there is no display to refresh.
+     *
+     * zrefresh() works entirely on state that zleread() sets up -- lpromptbuf,
+     * rpromptbuf, nbuf/obuf, winw/winh. Before the line editor has started,
+     * those are the values a __thread pointer has at birth, and every one of
+     * them is read here without a check. Two device crashes in a row landed in
+     * this function for exactly that reason: countprompt(lpromptbuf) at NULL,
+     * and then, once that was guarded, rpromptbuf[0] a thousand lines further
+     * down. Guarding them one at a time is chasing the symptom.
+     *
+     * This is zsh's own invariant, not a new rule: adjustwinsize() refuses the
+     * same way (`if (zleactive && resetzle)`, Src/utils.c), and zleread()'s own
+     * comment says a handler "must not see zleactive = 1 until ZLE really is
+     * active".
+     *
+     * The path that reaches here without it is getbyte()'s EIO kludge in
+     * Src/Zle/zle_main.c -- attachtty(mypgrp) followed by an unguarded
+     * zrefresh(), which its own comment calls a kludge. It runs during
+     * query_terminal()'s probe while zsh/zle is being LOADED -- so
+     * `zmodload zsh/compctl` from a checkpoint-restored shell's state script
+     * was enough, because the restored pty answers that first read with EIO.
+     */
+    if (!zleactive)
+	return;
+
     /*
      * zrefresh() is called from all over the place, so we can't
      * be sure if the line is metafied for completion or not.
