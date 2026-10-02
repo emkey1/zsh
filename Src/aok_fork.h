@@ -26,11 +26,16 @@
  * like that; `( )`, a pipeline element and a background job hand their child a
  * DEAD exit trap instead. See aok_emit_exit_trap. */
 #define AOK_SUB_EXITTRAP 0x08
+/* Set by aok_spawn_subshell, never by a site: sp->subsh_counted, as a flag, so
+ * aok_child_bits can see it. */
+#define AOK_SUB_SUBSH    0x10
 
 /* The bits of AOK_ZSH_INHERIT's fourth field: facts about the CHILD, decided
  * by the site that spawns it, rather than state a fork would have copied. */
 #define AOK_CHILD_INCMD      0x01	/* AOK_SUB_INCMD, as the child sees it */
 #define AOK_CHILD_EXIT_INERT 0x02	/* define TRAPEXIT, do not arm it */
+#define AOK_CHILD_ASYNC_IGN  0x04	/* entersubsh's ESUB_ASYNC ignores, no MONITOR */
+#define AOK_CHILD_SUBSH      0x08	/* the text is a `( )` the child enters itself */
 
 #define AOK_MAX_CLOSE 32
 
@@ -88,6 +93,7 @@ extern __thread int aok_source_fd;
 /* Traps this shell was handed by its parent, which must not make it fork for
  * the command it was launched to run -- see the comment in aok_fork.c. */
 extern __thread int aok_inherited_ntraps;
+extern __thread int aok_async_ign_subsh;
 
 /* AOK_SUB_INCMD, as the child sees it: set by aok_child_init and consumed by
  * the first sublist execlist runs afterwards. */

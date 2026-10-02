@@ -1501,6 +1501,16 @@ static int aok_child_bits(int flags)
     if (shf && !(shf->node.flags & PM_UNDEFINED) &&
 	(!(sigtrapped[SIGEXIT] & ZSIG_FUNC) || !(flags & AOK_SUB_EXITTRAP)))
 	bits |= AOK_CHILD_EXIT_INERT;
+    /* entersubsh's `if (!isset(MONITOR)) { if (flags & ESUB_ASYNC) {
+     * settrap(SIGINT, NULL, 0); settrap(SIGQUIT, NULL, 0); ...`: a background
+     * job with no job control ignores ^C and ^\ so they reach only the
+     * foreground. The child has to do it to itself -- a spawn can set a
+     * signal to its default but has no way to ignore one -- and it has to be
+     * a trap, not a bare SIG_IGN, because a forked child's `trap` lists it. */
+    if ((flags & AOK_SUB_ASYNC) && !isset(MONITOR))
+	bits |= AOK_CHILD_ASYNC_IGN;
+    if (flags & AOK_SUB_SUBSH)
+	bits |= AOK_CHILD_SUBSH;
     return bits;
 }
 
@@ -2649,17 +2659,32 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
 	sigaddset(&dfl, SIGTSTP);
 	sigaddset(&dfl, SIGTTIN);
 	sigaddset(&dfl, SIGTTOU);
-	/* SIGQUIT too, and only for a child that is not asynchronous.
+	/* SIGQUIT too, unless a trap ignores it (entersubsh's own test).
 	 *
 	 * zsh ignores SIGQUIT for itself in init_signals, and exec PRESERVES
 	 * SIG_IGN -- so a re-launched child started up, found QUIT already
 	 * ignored, and recorded it as an inherited trap. `$(trap)` then listed
 	 * a `trap -- '' QUIT` that a real forked subshell does not have, which
 	 * is the one line this whole conversion differed from the guest's own
-	 * zsh by. entersubsh ignores INT and QUIT only for ESUB_ASYNC, so this
-	 * matches it: a background job keeps the ignore. */
-	if (!(sp->flags & AOK_SUB_ASYNC))
+	 * zsh by. */
+	if (!(sigtrapped[SIGQUIT] & ZSIG_IGNORED))
 	    sigaddset(&dfl, SIGQUIT);
+	/* entersubsh's `if (interact)` block, the rest of the same rule. An
+	 * interactive shell ignores SIGTERM for itself (init_signals), so
+	 * without this every command it ran -- a foreground one, a `$(...)`, a
+	 * background job -- ignored SIGTERM too, and `kill %1` or `kill PID`
+	 * silently did nothing to it. INT and PIPE are only ever handled, never
+	 * ignored, by an interactive shell, so for those this matters when an
+	 * ancestor's ignore came in through exec. A background job with no job
+	 * control has INT and QUIT ignored again by the child itself, after
+	 * this: see AOK_CHILD_ASYNC_IGN. */
+	if (interact) {
+	    sigaddset(&dfl, SIGTERM);
+	    if (!(sigtrapped[SIGINT] & ZSIG_IGNORED))
+		sigaddset(&dfl, SIGINT);
+	    if (!sigtrapped[SIGPIPE])
+		sigaddset(&dfl, SIGPIPE);
+	}
 	/* And the same rule generalised, which is what SIGQUIT above is one
 	 * instance of: `trap '' SIG` installs a REAL SIG_IGN, exec preserves
 	 * SIG_IGN, and entersubsh's first act in a forked child is to unsettrap
@@ -2670,11 +2695,12 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
 	 * great-grandchild that never asked for it. Confirmed the same way for
 	 * TERM, PIPE and USR1.
 	 *
-	 * The two exceptions are entersubsh's own, not conveniences:
-	 * POSIXTRAPS is the option that makes an ignored trap survive the
-	 * unsettrap loop, and a background job re-ignores INT and QUIT for
-	 * itself (settrap(SIGINT, NULL, 0) under ESUB_ASYNC) so resetting them
-	 * would be undone a moment later anyway. ZSIG_FUNC cannot appear here
+	 * The exceptions are entersubsh's own, not conveniences: KEEPTRAP is
+	 * the site saying the traps stay, and POSIXTRAPS is the option that
+	 * makes an ignored trap survive the unsettrap loop. A background job
+	 * with no job control gets INT and QUIT ignored again afterwards, by the
+	 * child (AOK_CHILD_ASYNC_IGN), as entersubsh does after its loop.
+	 * ZSIG_FUNC cannot appear here
 	 * -- a function trap is not an ignore -- but the test is written the
 	 * way entersubsh writes it so the two stay comparable. */
 	if (!(sp->flags & AOK_SUB_KEEPTRAP) && !isset(POSIXTRAPS)) {
@@ -2683,9 +2709,6 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
 	    for (sig = 1; sig <= SIGCOUNT; sig++) {
 		if (!(sigtrapped[sig] & ZSIG_IGNORED) ||
 		    (sigtrapped[sig] & ZSIG_FUNC))
-		    continue;
-		if ((sp->flags & AOK_SUB_ASYNC) &&
-		    (sig == SIGINT || sig == SIGQUIT))
 		    continue;
 		sigaddset(&dfl, sig);
 	    }
@@ -2727,7 +2750,8 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
     histfile = aok_write_hist_file();
     envp = aok_relaunch_env(statepipe[0],
 			    zsh_subshell + (sp->subsh_counted ? 0 : 1),
-			    sp->flags, histfile);
+			    sp->flags | (sp->subsh_counted ? AOK_SUB_SUBSH : 0),
+			    histfile);
     err = posix_spawn(&pid, AOK_ZSH_PATH, &fa, attr ? &attr : NULL, argv, envp);
     aok_relaunch_env_free(envp);
     if (attr)
@@ -2831,6 +2855,19 @@ static __thread char *aok_inherit_underscore;
  * state is what defines TRAPEXIT in the first place). */
 static __thread int aok_exit_inert;
 
+/* AOK_CHILD_ASYNC_IGN, held the same way: installed after the state, since
+ * entersubsh ignores INT and QUIT after it has dealt with the inherited traps,
+ * so the ignore wins over a trap the state brought with it. */
+static __thread int aok_async_ign;
+
+/* The same ignores, deferred to the child's first entersubsh. When what was
+ * handed over is a `( ... )` (AOK_CHILD_SUBSH), the child enters that subshell
+ * itself, and entersubsh's unsettrap loop would take ignores installed at
+ * start-up straight back off: `( trap ) &` listed nothing where zsh lists INT
+ * and QUIT. That entersubsh IS the one the site's fork would have run, so it is
+ * where they go; a nested `( )` further in still clears them, as zsh's does. */
+__thread int aok_async_ign_subsh;
+
 /* getopts' position within a clustered option word, held for the same reason
  * and installed in the same place: the state script is an anonymous function,
  * and doshfunc zeroes optcind on the way in and restores its own saved copy on
@@ -2909,6 +2946,11 @@ static char *aok_adopt_inherit(int validated)
     zsh_subshell = (zlong) subshell;
     aok_relaunch_incmd = (cbits & AOK_CHILD_INCMD) != 0;
     aok_exit_inert = (cbits & AOK_CHILD_EXIT_INERT) != 0;
+    aok_async_ign = (cbits & AOK_CHILD_ASYNC_IGN) != 0;
+    if (aok_async_ign && (cbits & AOK_CHILD_SUBSH)) {
+	aok_async_ign = 0;
+	aok_async_ign_subsh = 1;
+    }
     aok_inherit_optcind = (int) coptcind;
     shtimer.tv_sec = (time_t) shsec;
     shtimer.tv_nsec = (long) shnsec;
@@ -3151,6 +3193,12 @@ void aok_child_init(void)
      * fork at all. */
     if (aok_exit_inert)
 	aok_disarm_exit_trap();
+    /* Before the count too, for the same reason: entersubsh's ignores are
+     * traps the child was started with, not ones it set itself. */
+    if (aok_async_ign) {
+	settrap(SIGINT, NULL, 0);
+	settrap(SIGQUIT, NULL, 0);
+    }
     optcind = aok_inherit_optcind;
     aok_inherited_ntraps = nsigtrapped;
     aok_relaunch_incmd = incmd;

@@ -1252,6 +1252,18 @@ entersubsh(int flags, struct entersubsh_ret *retp)
     exit_val = 0; 		/* parent exit status is irrelevant */
     if (flags & ESUB_NOMONITOR)
 	opts[MONITOR] = 0;
+    /* AOK: the async ignores of the fork this re-launched child stands in
+     * for, when the child is entering the `( )` it was handed -- see
+     * aok_async_ign_subsh. Counted as inherited, as aok_child_init counts the
+     * ones it installs, since they are the site's and not this shell's. */
+    if (aok_async_ign_subsh) {
+	int ntraps = nsigtrapped;
+
+	aok_async_ign_subsh = 0;
+	settrap(SIGINT, NULL, 0);
+	settrap(SIGQUIT, NULL, 0);
+	aok_inherited_ntraps += nsigtrapped - ntraps;
+    }
     if (!isset(MONITOR)) {
 	if (flags & ESUB_ASYNC) {
 	    settrap(SIGINT, NULL, 0);
