@@ -95,6 +95,32 @@
 #define AOK_VAR_INHERIT  "AOK_ZSH_INHERIT"
 #define AOK_VAR_HISTFILE "AOK_ZSH_HISTFILE"
 
+/* A command text too long for argv: the state carries it instead, as this
+ * parameter, and the child runs it in place of its -c argument (see
+ * aok_child_command). One argument string is at most MAX_ARG_STRLEN, 128 KB
+ * on Linux, and a simple command's expanded words travel as ONE string --
+ * `rm *` in a directory of a few thousand files is past it, and was E2BIG
+ * ("argument list too long") in the user's login shell where a real fork
+ * execs nothing. Shorter commands stay in argv, where ps can show them. */
+#define AOK_VAR_CMDTEXT  "AOK_ZSH_CMDTEXT"
+#define AOK_CMDTEXT_ARGV_MAX (64 * 1024)
+/* What argv says instead. Never run if the state arrived; a loud failure if
+ * it did not, rather than a command that silently did nothing. */
+#define AOK_CMDTEXT_STUB \
+    "builtin print -ru2 -- 'zsh: the command did not arrive with the subshell state'; builtin exit 126"
+
+/* The text aok_emit_epilogue puts in the state, for the one spawn writing it;
+ * unmetafied, as the state is shell input the child reads afresh. */
+static char *aok_pending_cmdtext;
+
+/* `$_` the same way, and for the same reason: it is the last word of the
+ * previous command, so after `a=$(seq 1 30000)` or `ls *` it can be any size,
+ * and it rides in AOK_VAR_INHERIT -- one environment string, held to the same
+ * 128 KB. Past AOK_CMDTEXT_ARGV_MAX that field is left empty and the state
+ * carries it instead; the child applies it where it applies the field's. */
+#define AOK_VAR_UNDERSCORE "AOK_ZSH_UNDERSCORE"
+static char *aok_pending_underscore;
+
 /* The last line the state emits. The child checks for it and complains on the
  * REAL stderr if it is missing.
  *
@@ -2164,6 +2190,18 @@ static void aok_emit_epilogue(int fd)
      * finish rather than as silence. */
     fflush(out);
     aok_emit_disabled(fileno(out));
+    /* A bare assignment for the same reason as the sentinel's, and before it,
+     * so that a command that did not arrive is a state that did not finish. */
+    if (aok_pending_cmdtext) {
+	fprintf(out, "%s=", AOK_VAR_CMDTEXT);
+	aok_emit_quoted(out, aok_pending_cmdtext);
+	fputc('\n', out);
+    }
+    if (aok_pending_underscore) {
+	fprintf(out, "%s=", AOK_VAR_UNDERSCORE);
+	aok_emit_quoted(out, aok_pending_underscore);
+	fputc('\n', out);
+    }
     fprintf(out, "%s=1\n", AOK_VAR_OK);
     fclose(out);
 }
@@ -2283,9 +2321,18 @@ static char *aok_inherit_string(zlong subshell, int flags)
      * second byte of plenty of ordinary UTF-8 -- came back two bytes long. */
     const char *under = zunderscore ? unmetafy(dupstring(zunderscore), NULL)
 				    : "";
-    size_t cap = 192 + (size_t) numpipestats * 12 + strlen(under), len;
-    char *s = (char *) zalloc(cap);
+    size_t cap, len;
+    char *s;
     int i;
+
+    zsfree(aok_pending_underscore);
+    aok_pending_underscore = NULL;
+    if (strlen(under) > AOK_CMDTEXT_ARGV_MAX) {
+	aok_pending_underscore = ztrdup(under);
+	under = "";
+    }
+    cap = 192 + (size_t) numpipestats * 12 + strlen(under);
+    s = (char *) zalloc(cap);
 
     /* Always a freeable string, never NULL: aok_relaunch_env_free finds the
      * entries it owns by counting back from the end of the vector, so a
@@ -2733,7 +2780,7 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
      * 141. A leading `-` is not exotic: it is any command name starting with a
      * dash, including the mistyped ones. */
     argv[3] = "--";
-    argv[4] = cmd;
+    argv[4] = strlen(cmd) > AOK_CMDTEXT_ARGV_MAX ? AOK_CMDTEXT_STUB : cmd;
     /* $0. A subshell keeps the parent's, so without this every re-launch would
      * name itself "zsh" in its own error messages. The positional parameters
      * come from the state, not from here, so that $@ survives quoting. */
@@ -2757,7 +2804,12 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
     if (attr)
 	posix_spawnattr_destroy(&attr);
     posix_spawn_file_actions_destroy(&fa);
-    zsfree(cmd);
+    /* A long command goes in the state (AOK_VAR_CMDTEXT), so it is kept until
+     * the state is written. */
+    if (argv[4] == cmd) {
+	zsfree(cmd);
+	cmd = NULL;
+    }
 
     if (err != 0) {
 	/* Nothing is going to read it, so nothing is going to remove it. */
@@ -2767,6 +2819,9 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
 	}
 	zclose(statepipe[0]);
 	zclose(statepipe[1]);
+	zsfree(cmd);
+	zsfree(aok_pending_underscore);
+	aok_pending_underscore = NULL;
 	errno = err;
 	return (pid_t) -1;
     }
@@ -2774,7 +2829,12 @@ pid_t aok_spawn_subshell(char *cmdtext, struct aok_spawn *sp)
 	zsfree(histfile);
 
     zclose(statepipe[0]);
+    aok_pending_cmdtext = cmd;
     aok_write_state(statepipe[1], sp->flags);
+    aok_pending_cmdtext = NULL;
+    zsfree(cmd);
+    zsfree(aok_pending_underscore);
+    aok_pending_underscore = NULL;
     zclose(statepipe[1]);
     return pid;
 }
@@ -3037,6 +3097,15 @@ static void aok_restore_pipestatus(char *pipes)
  * a real fork. */
 static void aok_restore_underscore(void)
 {
+    char *long_under = getsparam(AOK_VAR_UNDERSCORE);
+
+    /* Too long for the environment, so it came in the state (see
+     * AOK_VAR_UNDERSCORE). */
+    if (long_under) {
+	zsfree(aok_inherit_underscore);
+	aok_inherit_underscore = ztrdup(long_under);
+	unsetparam(AOK_VAR_UNDERSCORE);
+    }
     if (!aok_inherit_underscore)
 	return;
     setunderscore(aok_inherit_underscore);
@@ -3058,6 +3127,22 @@ static void aok_restore_lastval(char *lastvalstr)
 }
 
 /**/
+/* The command a re-launched child runs: its -c argument, or the text the
+ * state carried when that was too long for argv (AOK_VAR_CMDTEXT). Taken
+ * after aok_child_init has sourced the state; the parameter is removed, so it
+ * neither reaches what the command runs nor goes into the state of a child
+ * this shell spawns. Metafied, as execstring wants it. */
+char *aok_child_command(char *cmd)
+{
+    char *text = getsparam(AOK_VAR_CMDTEXT);
+
+    if (!text)
+	return cmd;
+    text = ztrdup(text);
+    unsetparam(AOK_VAR_CMDTEXT);
+    return text;
+}
+
 void aok_child_init(void)
 {
     char *fdstr, *lastvalstr, *pipes, *end, *histfile = NULL;

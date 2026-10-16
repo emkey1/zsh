@@ -63,6 +63,8 @@ char *aok_quote_words(LinkList args);
 
 /* Child side, called from init_misc before the -c string is parsed. */
 void aok_child_init(void);
+/* The command to run after aok_child_init: -c's, or the state's when long. */
+char *aok_child_command(char *cmd);
 
 /* Write this shell's whole state, as the script a re-launched child sources.
  *

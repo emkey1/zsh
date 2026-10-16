@@ -1583,6 +1583,8 @@ init_misc(char *cmd, char *zsh_name)
 	 * state applied inside the same string would be invisible to the
 	 * command it was applied for. See Src/aok_fork.c. */
 	aok_child_init();
+	/* AOK: a command too long for argv came in the state instead. */
+	cmd = aok_child_command(cmd);
 	execstring(cmd, 0, 1, "cmdarg");
 	stopmsg = 1;
 	zexit((exit_pending || shell_exiting) ? exit_val : lastval, ZEXIT_NORMAL);

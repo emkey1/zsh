@@ -533,14 +533,35 @@ init_parse(void)
  * careful: copy_ecstr is from arg1 to arg2, unlike memcpy
  */
 
+/* AOK: without recursion. The tree is ordered by hasher() first, and for
+ * words whose hashes rise with them -- 1, 2, ... 100000, file-1 ... file-3000,
+ * what `${=$(seq ...)}` or a glob expands to -- every insertion takes the same
+ * side, so the tree is a chain as long as the command. Recursing down it took
+ * a frame per word: on the task thread of a native zsh, the subshell given
+ * 100,000 words overflowed its stack and the app died of SIGILL (stack guard).
+ * The order the strings are copied in does not matter, each has its own
+ * offset, so a list of subtrees still to visit does the same work. */
 static void
 copy_ecstr(Eccstr s, char *p)
 {
+    Eccstr *todo = NULL;
+    size_t n = 0, cap = 0;
+
     while (s) {
 	memcpy(p + s->aoffs, s->str, strlen(s->str) + 1);
-	copy_ecstr(s->left, p);
+	if (s->left) {
+	    if (n == cap) {
+		cap = cap ? cap * 2 : 64;
+		todo = (Eccstr *) zrealloc(todo, cap * sizeof(*todo));
+	    }
+	    todo[n++] = s->left;
+	}
 	s = s->right;
+	if (!s && n)
+	    s = todo[--n];
     }
+    if (todo)
+	zfree(todo, cap * sizeof(*todo));
 }
 
 static Eprog
