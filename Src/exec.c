@@ -384,6 +384,112 @@ static int aok_pipeio_inherit(void)
     return (int) bits & (AOK_PIPEIO_IN | AOK_PIPEIO_OUT);
 }
 
+/* AOK: the redirections this shell is in the middle of, for a checkpoint.
+ *
+ * A redirection on a command the shell runs ITSELF -- a builtin, a function,
+ * `{ ... }`, a loop -- lasts as long as the command: execcmd_exec moves the
+ * descriptor it replaces to 10 or above, remembers where in its local save[]
+ * (addfd), and fixfds puts it back. A checkpoint does not wait for that. It
+ * parks the shell at a syscall, and a restored native zsh is RE-LAUNCHED at
+ * its prompt (kernel/checkpoint.c, ckpt_dispatch_native), so the command and
+ * the save[] that would have undone its redirection are both gone -- while
+ * the image recorded the descriptors as they were mid-command. The shell came
+ * back redirected for good. `echo suspend > /proc/ish/checkpoint`, the
+ * suspend's own documented spelling, is parked between the echo and its
+ * fixfds every time: the restored shell's stdout was the checkpoint file, and
+ * every command after a resume said "write error: invalid argument".
+ *
+ * So each execcmd_exec links its save[] here, and aok_ckpt_fds reads the chain
+ * to say what the descriptors would be had every running command finished.
+ * Linked through the frames themselves, which costs two stores; unlinked by
+ * the CALLER, execpline2, because execcmd_exec has a dozen ways out and its
+ * caller has one. */
+struct aok_redir_frame {
+    int *save;
+    struct aok_redir_frame *up;
+};
+static __thread struct aok_redir_frame *aok_redir_top;
+
+/* A save[] entry naming a copy that is still one. fixfds and the `exec >f`
+ * path close the copies as they go, and zclose clears the mark before its
+ * close() -- the syscall a checkpoint can park at -- so a shell parked partway
+ * through either has already put that descriptor back, or meant it to stay. */
+static int aok_saved_copy(int fd)
+{
+    return fd >= 10 && fd <= max_zsh_fd && (fdtable[fd] & FDT_SAVED_MASK);
+}
+
+/* The shell's OWN descriptors at 10 and above: SHIN, SHTTY, the copies above,
+ * and the xtrace and process-substitution ones a running command holds. A re-launched shell opens its own afresh and never learns the
+ * old numbers, so carried into it they are only leaked -- one more /dev/null
+ * or terminal per suspend and resume, for ever. Not {fd}> ones, a module's or
+ * a zsystem flock's: those are the user's, held on purpose. */
+static int aok_own_fd(int fd)
+{
+    int type;
+
+    if (fd < 10 || fd > max_zsh_fd)
+	return 0;
+    type = fdtable[fd] & FDT_TYPE_MASK;
+    return type == FDT_INTERNAL || type == FDT_XTRACE || type == FDT_PROC_SUBST;
+}
+
+/* AOK: the descriptors this shell should come back with, which is what a
+ * checkpoint records for it: those it would hold had every command it is
+ * running finished (see aok_redir_top), and none of its own. Called by
+ * kernel/zsh_glue.c on the shell's own thread, from its parking place.
+ *
+ * As pairs: number pairs[2k] should hold what pairs[2k+1] holds now, or
+ * nothing when that is -1. Writes at most `max` pairs and returns how many
+ * there are, so a caller can ask with 0 first.
+ *
+ * A frame's save[i] is what fd i was when THAT frame redirected it, so the
+ * outermost frame's is the shell's own: the chain is walked from the inside
+ * out and the last word stands. -1 is "it was closed", upstream's meaning
+ * (fixfds closes it again). The copies themselves are the shell's own and go
+ * with the rest. */
+int
+aok_ckpt_fds(int *pairs, int max)
+{
+    struct aok_redir_frame *f;
+    int top[10], i, n = 0;
+
+    for (i = 0; i < 10; i++)
+	top[i] = -2;
+    for (f = aok_redir_top; f; f = f->up)
+	for (i = 0; i < 10; i++)
+	    if (f->save[i] == -1 || aok_saved_copy(f->save[i]))
+		top[i] = f->save[i];
+    for (i = 0; i < 10; i++) {
+	if (top[i] == -2)
+	    continue;
+	if (n < max) {
+	    pairs[2 * n] = i;
+	    pairs[2 * n + 1] = top[i];
+	}
+	n++;
+    }
+    for (i = 10; i <= max_zsh_fd; i++) {
+	if (!aok_own_fd(i))
+	    continue;
+	if (n < max) {
+	    pairs[2 * n] = i;
+	    pairs[2 * n + 1] = -1;
+	}
+	n++;
+    }
+    return n;
+}
+
+/* A second zsh on one task inherits the first one's thread-locals (see
+ * native_zsh_main), and frames on a stack that is gone are worse than any
+ * other stale global: a checkpoint would read through them. */
+void
+aok_redir_forget(void)
+{
+    aok_redir_top = NULL;
+}
+
 /* Execution functions. */
 
 static int (*execfuncs[WC_COUNT-WC_CURSH]) (Estate, int) = {
@@ -2240,6 +2346,8 @@ execpline2(Estate state, wordcode pcode,
 	   int how, int input, int output, int last1)
 {
     struct execcmd_params eparams;
+    /* AOK: execcmd_exec links a frame and leaves it; see aok_redir_top. */
+    struct aok_redir_frame *aok_top = aok_redir_top;
 
     if (breaks || retflag)
 	return;
@@ -2260,6 +2368,7 @@ execpline2(Estate state, wordcode pcode,
     if (WC_PIPE_TYPE(pcode) == WC_PIPE_END) {
 	execcmd_analyse(state, &eparams);
 	execcmd_exec(state, &eparams, input, output, how, last1 ? 1 : 2, -1);
+	aok_redir_top = aok_top;
     } else {
 	int pipes[2];
 	int old_list_pipe = list_pipe;
@@ -2274,6 +2383,7 @@ execpline2(Estate state, wordcode pcode,
 
 	addfilelist(NULL, pipes[0]);
 	execcmd_exec(state, &eparams, input, pipes[1], how, 0, pipes[0]);
+	aok_redir_top = aok_top;
 	zclose(pipes[1]);
 	state->pc = next;
 
@@ -3400,6 +3510,8 @@ execcmd_exec(Estate state, Execcmd_params eparams,
      * command the re-launch was handed. Both taken at entry; see the note
      * above AOK_VAR_PIPEIO and aok_pipeio_claim below. */
     int aok_pipeio_mine, aok_relaunch_cmd;
+    /* AOK: this frame's save[], for a checkpoint. See aok_redir_top. */
+    struct aok_redir_frame aok_frame;
     int is_shfunc = 0, is_builtin = 0, is_exec = 0, use_defpath = 0;
     /* Various flags to the command. */
     int cflags = 0, orig_cflags = 0, checked = 0, oautocont = -1;
@@ -3453,6 +3565,9 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 	save[i] = -2;
 	mfds[i] = NULL;
     }
+    aok_frame.save = save;
+    aok_frame.up = aok_redir_top;
+    aok_redir_top = &aok_frame;
 
     /* If the command begins with `%', then assume it is a *
      * reference to a job in the job table.                */
@@ -4581,6 +4696,11 @@ execcmd_exec(Estate state, Execcmd_params eparams,
 			 * to do it below.
 			 */
 			closed = 1;
+			/* AOK: a saved copy like addfd's, so it is one to
+			 * entersubsh and to aok_ckpt_fds. Unmarked, a
+			 * shell checkpointed inside `cmd 2>&-` came back
+			 * with no stderr and a stray copy of it. */
+			fdtable[save[fn->fd1]] |= FDT_SAVED_MASK;
 		    }
 		}
 		if (fn->fd1 < 10)

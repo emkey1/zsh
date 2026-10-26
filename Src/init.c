@@ -1947,6 +1947,7 @@ zsh_main(UNUSED(int argc), char **argv)
     setlocale(LC_ALL, "");
 #endif
 
+    aok_redir_forget();
     init_jobs(argv, environ);
 
     /*

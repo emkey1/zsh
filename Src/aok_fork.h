@@ -75,6 +75,13 @@ char *aok_child_command(char *cmd);
  * it reads is __thread. */
 void aok_write_state(int fd, int flags);
 
+/* The other half of that description: the descriptors this shell would hold
+ * had every command it is running finished, as (number, now-at) pairs. In
+ * exec.c, beside the frames it reads; see aok_redir_top there. */
+int aok_ckpt_fds(int *pairs, int max);
+/* Drop the frames a previous zsh on this thread left. Called by zsh_main. */
+void aok_redir_forget(void);
+
 /* True when this thread's C stack is nearly spent, so that a recursion about
  * to go one level deeper refuses instead. Overrunning the stack of a native
  * program kills the app rather than the shell -- see the long comment in
