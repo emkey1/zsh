@@ -109,17 +109,40 @@
 #define AOK_CMDTEXT_STUB \
     "builtin print -ru2 -- 'zsh: the command did not arrive with the subshell state'; builtin exit 126"
 
-/* The text aok_emit_epilogue puts in the state, for the one spawn writing it;
- * unmetafied, as the state is shell input the child reads afresh. */
-static char *aok_pending_cmdtext;
+/* The text aok_emit_epilogue puts in the state, for the spawn writing it;
+ * unmetafied, as the state is shell input the child reads afresh.
+ *
+ * __thread for the reason every other static in this file is: two native zsh
+ * shells are two guest task threads in ONE address space, so a file-scope
+ * `static` here is not per-shell, it is shared by every live shell. These two
+ * were plain statics until tools/check-bash-tls.py was first run over a
+ * release build, and they are not state a shell MEANS to share -- they are
+ * scratch belonging to one spawn, file-scope only because aok_spawn_subshell
+ * sets them while aok_emit_epilogue, three frames down inside
+ * aok_write_state, reads them.
+ *
+ * Shared, the window between the two is wide enough to matter: aok_write_state
+ * puts the state down a pipe the child has to drain, so it blocks for as long
+ * as the child's startup takes. The assignments are unconditional -- a short
+ * command stores NULL here -- so ANY other shell spawning ANY subshell in that
+ * window overwrites both. A shell handing over a long command would find NULL
+ * and its child would run AOK_CMDTEXT_STUB ("the command did not arrive with
+ * the subshell state", exit 126); the other order hands that child the OTHER
+ * shell's command text. zsh is the login shell on a device, so two shells
+ * spawning at once is the ordinary case, not a contrived one. */
+static __thread char *aok_pending_cmdtext;
 
 /* `$_` the same way, and for the same reason: it is the last word of the
  * previous command, so after `a=$(seq 1 30000)` or `ls *` it can be any size,
  * and it rides in AOK_VAR_INHERIT -- one environment string, held to the same
  * 128 KB. Past AOK_CMDTEXT_ARGV_MAX that field is left empty and the state
- * carries it instead; the child applies it where it applies the field's. */
+ * carries it instead; the child applies it where it applies the field's.
+ *
+ * __thread for the reason aok_pending_cmdtext gives, with one more edge of its
+ * own: aok_inherit_string frees this unconditionally before storing, so shared
+ * it is one shell calling zsfree on the string another is about to emit. */
 #define AOK_VAR_UNDERSCORE "AOK_ZSH_UNDERSCORE"
-static char *aok_pending_underscore;
+static __thread char *aok_pending_underscore;
 
 /* The last line the state emits. The child checks for it and complains on the
  * REAL stderr if it is missing.
