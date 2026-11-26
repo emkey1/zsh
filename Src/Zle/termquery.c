@@ -528,7 +528,7 @@ query_terminal(void) {
 	}
     }
 
-    /* AOK-iSH: over ssh the client's TERM_PROGRAM does not arrive, so the
+    /* AOK-Workstation: over ssh the client's TERM_PROGRAM does not arrive, so the
      * test above cannot recognise a terminal that prints the RGB query
      * instead of consuming it ("+q524742" before the first prompt). With the
      * terminal unknown, leave that one query out; COLORTERM or
